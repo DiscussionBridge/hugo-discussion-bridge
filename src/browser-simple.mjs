@@ -50,7 +50,7 @@ function render(root, replies, topicUrl, origin, truncated) {
   const header = element("div", "discussionbridge-simple__header");
   header.append(element("h2", "", "Comments"), link(topicUrl, "Open discussion")); fragment.append(header);
   if (!replies.length) {
-    const empty = element("p", "discussionbridge-simple__empty", "No replies yet. ");
+    const empty = element("p", "discussionbridge-simple__empty", "No comments yet. ");
     empty.append(link(topicUrl, "Start the conversation on The Bridge.")); fragment.append(empty);
   } else {
     for (const post of replies.slice(0, INITIAL_REPLIES)) fragment.append(reply(post, topicUrl, origin));
