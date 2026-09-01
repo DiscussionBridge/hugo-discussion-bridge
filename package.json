@@ -1,6 +1,6 @@
 {
   "name": "hugo-discussion-bridge",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Build-time DiscussionBridge adapter for Hugo",
   "type": "module",
   "bin": { "discussionbridge-hugo": "./src/cli.mjs" },

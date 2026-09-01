@@ -14,6 +14,7 @@ export async function prepare({ manifestPath, outputPath, config, fetchImpl = fe
   const pages = preflight(manifest, config);
   const output = {};
   for (const page of pages) {
+    if (page.mode === "simple" && page.topic_id) output[page.key] = await retrieveSimple(page, config, fetchImpl);
     if (page.mode === "to_discourse") output[page.key] = await resolvePage(page, config, fetchImpl);
     if (page.mode === "from_discourse") output[page.key] = await retrieveRecord(page, config, fetchImpl);
   }
@@ -46,6 +47,10 @@ export function preflight(manifest, config) {
     urls.add(canonical.href);
     const title = bounded(raw.title, 1024, `${key} title`);
     const page = { key, mode: raw.mode, canonical_url: canonical.href, title };
+    if (raw.mode === "simple" && raw.topic_id !== undefined) {
+      if (!Number.isSafeInteger(raw.topic_id) || raw.topic_id <= 0) throw new Error(`Page ${key} has an invalid topic ID.`);
+      page.topic_id = raw.topic_id;
+    }
     if (raw.mode === "to_discourse") {
       page.content_html = cleanSourceHtml(bounded(raw.content_html, 49_152, `${key} content HTML`));
       page.external_id = `hugo-page:${createHash("sha256").update(canonical.href).digest("hex")}`;
@@ -58,11 +63,67 @@ export function preflight(manifest, config) {
   return pages.sort((a, b) => a.key.localeCompare(b.key, "en"));
 }
 
+async function retrieveSimple(page, config, fetchImpl) {
+  const base = serviceBase(config.serverUrl);
+  const topic = await publicJson(new URL(`/t/${page.topic_id}.json`, base), config, fetchImpl);
+  const stream = topic?.post_stream?.stream;
+  const initial = topic?.post_stream?.posts;
+  if (!Array.isArray(stream) || !Array.isArray(initial)) throw new Error(`Hugo Simple topic ${page.key} is invalid.`);
+  const ids = stream.slice(1, 51);
+  if (ids.some((id) => !Number.isSafeInteger(id) || id <= 0)) throw new Error(`Hugo Simple topic ${page.key} is invalid.`);
+  const byId = new Map(initial.filter((post) => Number.isSafeInteger(post?.id)).map((post) => [post.id, post]));
+  const missing = ids.filter((id) => !byId.has(id));
+  for (let offset = 0; offset < missing.length; offset += 20) {
+    const url = new URL(`/t/${page.topic_id}/posts.json`, base);
+    for (const id of missing.slice(offset, offset + 20)) url.searchParams.append("post_ids[]", String(id));
+    const batch = await publicJson(url, config, fetchImpl);
+    if (!Array.isArray(batch?.post_stream?.posts)) throw new Error(`Hugo Simple topic ${page.key} is invalid.`);
+    for (const post of batch.post_stream.posts) {
+      if (!Number.isSafeInteger(post?.id) || post.id <= 0) throw new Error(`Hugo Simple topic ${page.key} is invalid.`);
+      byId.set(post.id, post);
+    }
+  }
+  const slug = typeof topic.slug === "string" && /^[a-z0-9-]+$/.test(topic.slug) ? topic.slug : "topic";
+  const topicUrl = new URL(`/t/${slug}/${page.topic_id}`, base).href;
+  const replies = ids.map((id) => simpleReply(byId.get(id), topicUrl, base)).filter(Boolean);
+  return { topic_id: page.topic_id, topic_url: topicUrl, forum_origin: base.origin,
+    simple_html: simpleMarkup(replies, topicUrl, stream.length - 1 > 50) };
+}
+
+async function publicJson(url, config, fetchImpl) {
+  const base = serviceBase(config.serverUrl);
+  const response = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(config.timeoutMs), headers: { Accept: "application/json" } });
+  if (response.url && new URL(response.url).origin !== base.origin) throw new Error("Discourse public response changed service origin.");
+  if (!response.ok) throw new Error(`Discourse public request failed (${response.status}).`);
+  return boundedJson(response, config.maxResponseBytes);
+}
+
+function simpleReply(post, topicUrl, base) {
+  if (!post || !Number.isSafeInteger(post.post_number) || post.post_number < 2 || typeof post.username !== "string" || !post.username.trim() || typeof post.cooked !== "string" || typeof post.created_at !== "string") throw new Error("Discourse reply is invalid.");
+  const date = new Date(post.created_at); if (Number.isNaN(date.valueOf())) throw new Error("Discourse reply is invalid.");
+  const body = sanitizeHtml(post.cooked, { allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]), allowedAttributes: { a: ["href", "title", "rel"], img: ["src", "alt", "title", "width", "height"], code: ["class"], pre: ["class"] }, allowedSchemes: ["https"], allowProtocolRelative: false });
+  if (!body.trim()) return "";
+  const name = typeof post.name === "string" && post.name.trim() ? post.name.trim() : post.username.trim();
+  const template = typeof post.avatar_template === "string" && /^\/(?!\/)[^\u0000-\u001f\u007f]{1,500}$/.test(post.avatar_template) ? post.avatar_template : null;
+  const avatar = template ? `<img src="${escapeHtml(new URL(template.replace("{size}", "48"), base).href)}" alt="" width="48" height="48" loading="lazy">` : escapeHtml(post.username.trim().slice(0, 1).toUpperCase());
+  const href = `${topicUrl}/${post.post_number}`;
+  return `<article class="discussionbridge-simple__reply"><span class="discussionbridge-simple__avatar" aria-hidden="true">${avatar}</span><div class="discussionbridge-simple__content"><header class="discussionbridge-simple__meta"><strong>${escapeHtml(name)}</strong><a href="${escapeHtml(href)}" rel="nofollow noopener noreferrer"><time datetime="${escapeHtml(date.toISOString())}">${escapeHtml(date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }))}</time></a></header><div class="discussionbridge-simple__body">${body}</div></div></article>`;
+}
+
+function simpleMarkup(replies, topicUrl, truncated) {
+  const initial = replies.slice(0, 5).join(""); const rest = replies.slice(5);
+  const more = rest.length ? `<details class="discussionbridge-simple__more"><summary><span class="discussionbridge-simple__more-closed">Show ${rest.length} more ${rest.length === 1 ? "comment" : "comments"}</span><span class="discussionbridge-simple__more-open">Show fewer comments</span></summary>${rest.join("")}</details>` : "";
+  const limit = truncated ? `<p class="discussionbridge-simple__limit">Showing the first 50 replies. <a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">View the complete discussion on The Bridge</a>.</p>` : "";
+  return `<div class="discussionbridge-simple__header"><h2>Comments</h2><a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">Open discussion</a></div>${replies.length ? initial + more : '<p class="discussionbridge-simple__empty">No replies yet.</p>'}${limit}`;
+}
+
+function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]); }
+
 async function resolvePage(page, config, fetchImpl) {
   const body = { bridge_record: {
     direction: "to_discourse", external_id: page.external_id, canonical_url: page.canonical_url,
     title: page.title, content_html: page.content_html, published: true,
-    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.1",
+    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.2",
     visibility: "unlisted", correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
     ...(page.source_authors?.length ? { source_authors: page.source_authors, primary_source_author_id: page.primary_source_author_id } : {})
   }};
