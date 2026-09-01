@@ -25,7 +25,7 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
         const item = nativePublication(record, site.origin, config.serverUrl);
         if (!item) { summary.skipped++; continue; }
         const file = path.join(contentDir, "discussionbridge", `${item.slug}.md`);
-        const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(`Published from The Bridge by ${item.authorName}.`)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n`;
+        const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(`Published from The Bridge by ${item.authorName}.`)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n\nPublished from [The Bridge](${item.topicUrl}).<br>\nSource author: ${item.authorName} · Revision ${item.revision} · Hugo 0.165.0 · DiscussionBridge for Hugo 0.1.0-alpha.5\n`;
         let prior = null;
         try { prior = await readFile(file, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
         if (prior === output) { summary.unchanged++; continue; }
@@ -55,13 +55,13 @@ function nativePublication(record, siteOrigin, serverUrl) {
   const source = record.source;
   const base = serviceBase(serverUrl);
   if (!source || typeof source !== "object" || source.platform !== "discourse" || source.origin !== base.origin || source.topic_id !== record.topic_id || source.post_number !== 1 || !Number.isSafeInteger(source.post_id) || source.post_id < 1 || !Number.isSafeInteger(source.post_version) || source.post_version < 1 || source.revision !== `post:${source.post_id}:version:${source.post_version}`) throw new Error("Hugo publication source is invalid.");
-  presentationIdentity(record, serverUrl, "Hugo publication");
+  const identity = presentationIdentity(record, serverUrl, "Hugo publication");
   const updatedAt = bounded(source.updated_at, 64, "Hugo publication update time");
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u.test(updatedAt) || !Number.isFinite(Date.parse(updatedAt))) throw new Error("Hugo publication update time is invalid.");
   const authorName = bounded(source.author?.name, 200, "Hugo publication author");
   const profile = new URL(bounded(source.author?.profile_url, 2048, "Hugo publication author URL"));
   if (profile.origin !== base.origin || profile.search || profile.hash) throw new Error("Hugo publication author URL is invalid.");
-  return { resourceId: id, slug: match[1], title: bounded(record.title, 1024, "Hugo publication title"), revision: source.revision, updatedAt, authorName, topicId: record.topic_id };
+  return { resourceId: id, slug: match[1], title: bounded(record.title, 1024, "Hugo publication title"), revision: source.revision, updatedAt, authorName, topicId: record.topic_id, topicUrl: identity.topic_url };
 }
 
 export async function prepare({ manifestPath, outputPath, config, fetchImpl = fetch }) {

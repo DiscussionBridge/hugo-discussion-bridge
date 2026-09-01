@@ -87,6 +87,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"/);
   assert.match(output, /discussionbridge_source_revision = "post:149:version:1"/);
   assert.match(output, /discussionbridge mode="from_discourse"/);
+  assert.match(output, /Hugo 0\.165\.0 · DiscussionBridge for Hugo 0\.1\.0-alpha\.5/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });
 
