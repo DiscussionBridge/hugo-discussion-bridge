@@ -27,3 +27,20 @@ Required environment variables are `DISCUSSIONBRIDGE_SERVER_URL`,
 `DISCUSSIONBRIDGE_CONNECTION_ID`, and
 `DISCUSSIONBRIDGE_CONNECTION_SECRET_FILE`. Optional
 `DISCUSSIONBRIDGE_LANE` selects the connection lane.
+
+An operator may explicitly authorize The Bridge to create or update a native
+Hugo content record. Presentation-only bindings are ignored. The trusted build
+runs:
+
+```text
+discussionbridge-hugo sync-publications \
+  --content-dir content \
+  --site-url https://hugo.example.com/
+```
+
+The command validates the source topic/revision/author, exact Hugo destination,
+stable resource identity, and native-materialization authority before writing
+`content/discussionbridge/<slug>.md` atomically. The generated content record
+uses the ordinary authenticated From Discourse build path for its bounded,
+sanitized body and discussion. Exact retries are unchanged, identity collisions
+fail closed, and no secret enters Hugo content or public output.

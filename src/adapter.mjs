@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { open, readFile, rename, rm } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import sanitizeHtml from "sanitize-html";
 
@@ -8,6 +8,61 @@ const CONNECTION = /^dbc_[a-f0-9]{24}$/;
 const KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MODES = new Set(["simple", "full", "to_discourse", "from_discourse"]);
 const enc = new TextEncoder();
+
+export async function syncNativePublications({ contentDir, siteUrl, config, fetchImpl = fetch }) {
+  validateConfig(config);
+  const site = new URL(siteUrl);
+  if (site.protocol !== "https:" || site.username || site.password || site.pathname !== "/" || site.search || site.hash) throw new Error("Hugo site URL must be an HTTPS origin.");
+  const summary = { created: 0, updated: 0, unchanged: 0, skipped: 0, failed: 0 };
+  let page = 1;
+  for (;;) {
+    const response = await request(config, `/discussion-bridge/v1/bridge-records.json?page=${page}`, { method: "GET" }, fetchImpl);
+    const payload = await boundedJson(response, Math.min(config.maxResponseBytes * 4, 262_144));
+    if (!response.ok || !Array.isArray(payload.bridge_records) || !payload.pagination || typeof payload.pagination !== "object") throw new Error("DiscussionBridge publication feed is invalid.");
+    if (payload.pagination.page !== page || !Number.isSafeInteger(payload.pagination.pages) || payload.pagination.pages < 1 || payload.pagination.pages > 10_000) throw new Error("DiscussionBridge publication pagination is invalid.");
+    for (const record of payload.bridge_records) {
+      try {
+        const item = nativePublication(record, site.origin, config.serverUrl);
+        if (!item) { summary.skipped++; continue; }
+        const file = path.join(contentDir, "discussionbridge", `${item.slug}.md`);
+        const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(`Published from The Bridge by ${item.authorName}.`)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n`;
+        let prior = null;
+        try { prior = await readFile(file, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
+        if (prior === output) { summary.unchanged++; continue; }
+        if (prior && !prior.includes(`discussionbridge_resource_id = "${item.resourceId}"`)) throw new Error("Hugo publication identity collision.");
+        await mkdir(path.dirname(file), { recursive: true });
+        await atomicWrite(file, output);
+        summary[prior ? "updated" : "created"]++;
+      } catch { summary.failed++; }
+    }
+    if (page >= payload.pagination.pages) break;
+    page++;
+  }
+  return summary;
+}
+
+function nativePublication(record, siteOrigin, serverUrl) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) throw new Error("Hugo publication record is invalid.");
+  const bindings = Array.isArray(record.bindings) ? record.bindings.filter((item) => item && typeof item === "object" && !Array.isArray(item) && item.role === "presentation" && item.state === "active") : [];
+  if (!bindings.some((item) => item.native_materialization === true)) return null;
+  if (bindings.length !== 1 || bindings[0].native_materialization !== true) throw new Error("Hugo publication authority is ambiguous.");
+  if (record.direction !== "from_discourse" || record.state !== "healthy" || !Number.isSafeInteger(record.topic_id) || record.topic_id < 1) throw new Error("Hugo publication record is invalid.");
+  const id = resourceId(record.resource_id);
+  const destination = new URL(bounded(bindings[0].canonical_url, 2048, "Hugo publication destination"));
+  if (destination.origin !== siteOrigin || destination.search || destination.hash) throw new Error("Hugo publication destination is invalid.");
+  const match = /^\/discussionbridge\/([a-z0-9]+(?:-[a-z0-9]+)*)\/$/u.exec(destination.pathname);
+  if (!match) throw new Error("Hugo publication path is invalid.");
+  const source = record.source;
+  const base = serviceBase(serverUrl);
+  if (!source || typeof source !== "object" || source.platform !== "discourse" || source.origin !== base.origin || source.topic_id !== record.topic_id || source.post_number !== 1 || !Number.isSafeInteger(source.post_id) || source.post_id < 1 || !Number.isSafeInteger(source.post_version) || source.post_version < 1 || source.revision !== `post:${source.post_id}:version:${source.post_version}`) throw new Error("Hugo publication source is invalid.");
+  presentationIdentity(record, serverUrl, "Hugo publication");
+  const updatedAt = bounded(source.updated_at, 64, "Hugo publication update time");
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u.test(updatedAt) || !Number.isFinite(Date.parse(updatedAt))) throw new Error("Hugo publication update time is invalid.");
+  const authorName = bounded(source.author?.name, 200, "Hugo publication author");
+  const profile = new URL(bounded(source.author?.profile_url, 2048, "Hugo publication author URL"));
+  if (profile.origin !== base.origin || profile.search || profile.hash) throw new Error("Hugo publication author URL is invalid.");
+  return { resourceId: id, slug: match[1], title: bounded(record.title, 1024, "Hugo publication title"), revision: source.revision, updatedAt, authorName, topicId: record.topic_id };
+}
 
 export async function prepare({ manifestPath, outputPath, config, fetchImpl = fetch }) {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -123,7 +178,7 @@ async function resolvePage(page, config, fetchImpl) {
   const body = { bridge_record: {
     direction: "to_discourse", external_id: page.external_id, canonical_url: page.canonical_url,
     title: page.title, content_html: page.content_html, published: true,
-    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.4",
+    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.5",
     visibility: "unlisted", correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
     ...(page.source_authors?.length ? { source_authors: page.source_authors, primary_source_author_id: page.primary_source_author_id } : {})
   }};

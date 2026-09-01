@@ -3,7 +3,7 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { prepare, preflight } from "../src/adapter.mjs";
+import { prepare, preflight, syncNativePublications } from "../src/adapter.mjs";
 
 const config = { serverUrl: "https://bridge.example.com", connectionId: "dbc_0123456789abcdef01234567", connectionSecret: "s".repeat(48), lane: "hugo-demo" };
 const manifest = { site_origin: "https://hugo.example.com", pages: [
@@ -53,6 +53,41 @@ test("invalid later page prevents every request and output write", async () => {
   await assert.rejects(() => prepare({ manifestPath, outputPath, config: { ...config }, fetchImpl: async () => { calls++; } }), /outside the Hugo site origin/);
   assert.equal(calls, 0);
   await assert.rejects(() => readFile(outputPath), /ENOENT/);
+});
+
+test("native publication creates once, retries unchanged, and skips presentation-only records", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-native-"));
+  const source = {
+    resource_id: "33333333-3333-4333-8333-333333333333",
+    direction: "from_discourse",
+    state: "healthy",
+    title: "The Bridge publishes everywhere",
+    topic_id: 53,
+    topic_url: "https://bridge.example.com/t/publisher/53",
+    source: {
+      platform: "discourse",
+      origin: "https://bridge.example.com",
+      topic_id: 53,
+      post_id: 149,
+      post_number: 1,
+      post_version: 1,
+      revision: "post:149:version:1",
+      updated_at: "2026-09-01T06:57:52.495021Z",
+      author: { name: "DiscussionBridge", profile_url: "https://bridge.example.com/u/discussionbridge" },
+    },
+    bindings: [{ role: "presentation", state: "active", canonical_url: "https://hugo.example.com/discussionbridge/the-bridge-publishes-everywhere/", native_materialization: true }],
+  };
+  const presentationOnly = { ...source, resource_id: "44444444-4444-4444-8444-444444444444", bindings: [{ ...source.bindings[0], native_materialization: false }] };
+  const fetchImpl = async () => new Response(JSON.stringify({ bridge_records: [presentationOnly, source], pagination: { page: 1, pages: 1 } }), { status: 200, headers: { "content-type": "application/json" } });
+  const options = { contentDir: dir, siteUrl: "https://hugo.example.com/", config: { ...config }, fetchImpl };
+  assert.deepEqual(await syncNativePublications(options), { created: 1, updated: 0, unchanged: 0, skipped: 1, failed: 0 });
+  assert.deepEqual(await syncNativePublications(options), { created: 0, updated: 0, unchanged: 1, skipped: 1, failed: 0 });
+  const output = await readFile(path.join(dir, "discussionbridge", "the-bridge-publishes-everywhere.md"), "utf8");
+  assert.match(output, /discussionbridge_native_publication = true/);
+  assert.match(output, /discussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"/);
+  assert.match(output, /discussionbridge_source_revision = "post:149:version:1"/);
+  assert.match(output, /discussionbridge mode="from_discourse"/);
+  assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });
 
 test("browser Simple loader is credential-free, bounded, sanitized, and preserves a snapshot fallback", async () => {
