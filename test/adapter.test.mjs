@@ -54,3 +54,14 @@ test("invalid later page prevents every request and output write", async () => {
   assert.equal(calls, 0);
   await assert.rejects(() => readFile(outputPath), /ENOENT/);
 });
+
+test("browser Simple loader is credential-free, bounded, sanitized, and preserves a snapshot fallback", async () => {
+  const source = await readFile(new URL("../src/browser-simple.mjs", import.meta.url), "utf8");
+  assert.match(source, /credentials: "omit"/);
+  assert.match(source, /redirect: "error"/);
+  assert.match(source, /DOMPurify\.sanitize/);
+  assert.match(source, /MAX_REPLIES = 50/);
+  assert.match(source, /INITIAL_REPLIES = 5/);
+  assert.match(source, /discussionbridgeSimpleState = "snapshot"/);
+  assert.doesNotMatch(source, /X-DiscussionBridge|Connection-Secret|connectionSecret/);
+});

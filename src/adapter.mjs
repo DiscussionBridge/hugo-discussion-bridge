@@ -123,7 +123,7 @@ async function resolvePage(page, config, fetchImpl) {
   const body = { bridge_record: {
     direction: "to_discourse", external_id: page.external_id, canonical_url: page.canonical_url,
     title: page.title, content_html: page.content_html, published: true,
-    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.3",
+    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.4",
     visibility: "unlisted", correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
     ...(page.source_authors?.length ? { source_authors: page.source_authors, primary_source_author_id: page.primary_source_author_id } : {})
   }};
