@@ -69,7 +69,7 @@ function render(root, replies, topicUrl, origin, truncated) {
     }
   }
   if (truncated) {
-    const limit = element("p", "discussionbridge-simple__limit", `Showing the first ${MAX_REPLIES} replies. `);
+    const limit = element("p", "discussionbridge-simple__limit", `Showing the first ${MAX_REPLIES} comments. `);
     limit.append(link(topicUrl, "View the complete discussion on The Bridge"), "."); fragment.append(limit);
   }
   root.replaceChildren(fragment, ...(attributions ? [attributions] : []));
