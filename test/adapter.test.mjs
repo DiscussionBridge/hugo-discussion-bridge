@@ -7,7 +7,7 @@ import { prepare, preflight } from "../src/adapter.mjs";
 
 const config = { serverUrl: "https://bridge.example.com", connectionId: "dbc_0123456789abcdef01234567", connectionSecret: "s".repeat(48), lane: "hugo-demo" };
 const manifest = { site_origin: "https://hugo.example.com", pages: [
-  { key: "to-bridge", mode: "to_discourse", canonical_url: "https://hugo.example.com/to/", title: "To Bridge", content_html: "<h2>Article</h2><p>Useful content.</p><section class=\"discussionbridge-presentation\"><p>Preparing</p></section>" },
+  { key: "to-bridge", mode: "to_discourse", canonical_url: "https://hugo.example.com/to/", title: "To Bridge", content_html: "<h2>Article</h2>\n<p>Useful content.</p>\n<section class=\"discussionbridge-presentation\"><p>Preparing</p></section>" },
   { key: "from-bridge", mode: "from_discourse", canonical_url: "https://hugo.example.com/from/", title: "From Bridge", resource_id: "11111111-1111-4111-8111-111111111111" },
   { key: "simple", mode: "simple", canonical_url: "https://hugo.example.com/simple/", title: "Simple", topic_id: 23 }
 ] };

@@ -52,7 +52,7 @@ export function preflight(manifest, config) {
       page.topic_id = raw.topic_id;
     }
     if (raw.mode === "to_discourse") {
-      page.content_html = cleanSourceHtml(bounded(raw.content_html, 49_152, `${key} content HTML`));
+      page.content_html = cleanSourceHtml(boundedText(raw.content_html, 49_152, `${key} content HTML`));
       page.external_id = `hugo-page:${createHash("sha256").update(canonical.href).digest("hex")}`;
       page.source_authors = validateAuthors(raw.source_authors);
       page.primary_source_author_id = raw.primary_source_author_id;
@@ -123,7 +123,7 @@ async function resolvePage(page, config, fetchImpl) {
   const body = { bridge_record: {
     direction: "to_discourse", external_id: page.external_id, canonical_url: page.canonical_url,
     title: page.title, content_html: page.content_html, published: true,
-    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.2",
+    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.3",
     visibility: "unlisted", correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
     ...(page.source_authors?.length ? { source_authors: page.source_authors, primary_source_author_id: page.primary_source_author_id } : {})
   }};
@@ -143,7 +143,7 @@ async function retrieveRecord(page, config, fetchImpl) {
     throw new Error(`Hugo From Discourse record ${page.key} is unavailable.`);
   }
   const identity = presentationIdentity(record, config.serverUrl, page.key);
-  const content = sanitizeHtml(bounded(record.content_html, 65_536, `${page.key} record HTML`), {
+  const content = sanitizeHtml(boundedText(record.content_html, 65_536, `${page.key} record HTML`), {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]),
     allowedAttributes: { a: ["href", "title", "rel"], img: ["src", "alt", "title", "width", "height"], code: ["class"], pre: ["class"] },
     allowedSchemes: ["https"], allowProtocolRelative: false
@@ -184,6 +184,7 @@ function validateConfig(config) {
 function serviceBase(value) { const url = new URL(value); if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error("DiscussionBridge server URL must be HTTPS."); url.pathname = "/"; return url; }
 function resourceId(value) { if (typeof value !== "string" || !UUID.test(value)) throw new Error("DiscussionBridge resource ID is invalid."); return value.toLowerCase(); }
 function bounded(value, max, label) { if (typeof value !== "string" || !value.trim() || enc.encode(value).byteLength > max || /[\u0000-\u001f\u007f]/u.test(value)) throw new Error(`${label} is invalid.`); return value.trim(); }
+function boundedText(value, max, label) { if (typeof value !== "string" || !value.trim() || enc.encode(value).byteLength > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)) throw new Error(`${label} is invalid.`); return value.trim(); }
 function validateAuthors(value) { if (value === undefined) return []; if (!Array.isArray(value) || value.length > 20) throw new Error("Hugo source authors are invalid."); return value.map((a) => ({ id: bounded(a?.id, 255, "author ID"), name: bounded(a?.name, 200, "author name") })); }
 function cleanSourceHtml(value) { const withoutPresentation = value.replace(/<section[^>]+class="discussionbridge-presentation"[\s\S]*?<\/section>/giu, ""); const clean = sanitizeHtml(withoutPresentation, { allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2"]), allowedAttributes: { a: ["href", "title"], img: ["src", "alt", "title", "width", "height"], code: ["class"], pre: ["class"] }, allowedSchemes: ["https"], allowProtocolRelative: false }); if (!clean.trim()) throw new Error("Hugo source content is empty after sanitization."); return clean; }
 async function boundedJson(response, maximum) { const declared = Number(response.headers.get("content-length")); if (Number.isFinite(declared) && declared > maximum) throw new Error("DiscussionBridge response is too large."); const type = response.headers.get("content-type") ?? ""; if (!/^application\/json\b/i.test(type)) throw new Error("DiscussionBridge response is not JSON."); const text = await response.text(); if (enc.encode(text).byteLength > maximum) throw new Error("DiscussionBridge response is too large."); const value = JSON.parse(text); if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("DiscussionBridge response JSON is invalid."); return value; }
