@@ -1,0 +1,129 @@
+import { createHash, randomUUID } from "node:crypto";
+import { open, readFile, rename, rm } from "node:fs/promises";
+import path from "node:path";
+import sanitizeHtml from "sanitize-html";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CONNECTION = /^dbc_[a-f0-9]{24}$/;
+const KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MODES = new Set(["simple", "full", "to_discourse", "from_discourse"]);
+const enc = new TextEncoder();
+
+export async function prepare({ manifestPath, outputPath, config, fetchImpl = fetch }) {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const pages = preflight(manifest, config);
+  const output = {};
+  for (const page of pages) {
+    if (page.mode === "to_discourse") output[page.key] = await resolvePage(page, config, fetchImpl);
+    if (page.mode === "from_discourse") output[page.key] = await retrieveRecord(page, config, fetchImpl);
+  }
+  await atomicWrite(outputPath, `${JSON.stringify(output, null, 2)}\n`);
+  return { pages: pages.length, records: Object.keys(output).length };
+}
+
+export function preflight(manifest, config) {
+  validateConfig(config);
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest) || !Array.isArray(manifest.pages)) {
+    throw new Error("Hugo manifest must contain a pages array.");
+  }
+  if (manifest.pages.length > 10_000) throw new Error("Hugo manifest exceeds 10,000 pages.");
+  const origin = new URL(manifest.site_origin);
+  if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") {
+    throw new Error("Hugo manifest site_origin must be an HTTPS origin.");
+  }
+  const keys = new Set(); const urls = new Set();
+  const pages = manifest.pages.map((raw, index) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`Page ${index + 1} is invalid.`);
+    const key = bounded(raw.key, 100, "page key");
+    if (!KEY.test(key) || keys.has(key)) throw new Error(`Duplicate or invalid page key: ${key}.`);
+    keys.add(key);
+    if (!MODES.has(raw.mode)) throw new Error(`Page ${key} has an unsupported mode.`);
+    const canonical = new URL(bounded(raw.canonical_url, 2048, `${key} canonical URL`));
+    if (canonical.protocol !== "https:" || canonical.origin !== origin.origin || canonical.search || canonical.hash) {
+      throw new Error(`Page ${key} canonical URL is outside the Hugo site origin.`);
+    }
+    if (urls.has(canonical.href)) throw new Error(`Duplicate canonical URL: ${canonical.href}.`);
+    urls.add(canonical.href);
+    const title = bounded(raw.title, 1024, `${key} title`);
+    const page = { key, mode: raw.mode, canonical_url: canonical.href, title };
+    if (raw.mode === "to_discourse") {
+      page.content_html = cleanSourceHtml(bounded(raw.content_html, 49_152, `${key} content HTML`));
+      page.external_id = `hugo-page:${createHash("sha256").update(canonical.href).digest("hex")}`;
+      page.source_authors = validateAuthors(raw.source_authors);
+      page.primary_source_author_id = raw.primary_source_author_id;
+    }
+    if (raw.mode === "from_discourse") page.resource_id = resourceId(raw.resource_id);
+    return page;
+  });
+  return pages.sort((a, b) => a.key.localeCompare(b.key, "en"));
+}
+
+async function resolvePage(page, config, fetchImpl) {
+  const body = { bridge_record: {
+    direction: "to_discourse", external_id: page.external_id, canonical_url: page.canonical_url,
+    title: page.title, content_html: page.content_html, published: true,
+    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.1",
+    visibility: "unlisted", correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
+    ...(page.source_authors?.length ? { source_authors: page.source_authors, primary_source_author_id: page.primary_source_author_id } : {})
+  }};
+  const response = await request(config, "/discussion-bridge/v1/bridge-records/resolve.json", { method: "POST", body: JSON.stringify(body) }, fetchImpl);
+  const payload = await boundedJson(response, config.maxResponseBytes);
+  if (!response.ok || !["created", "resolved"].includes(payload.outcome) || payload.core_fallback !== false || payload.direction !== "to_discourse") {
+    throw new Error(`Hugo page ${page.key} was rejected (${response.status}).`);
+  }
+  return presentationIdentity(payload, config.serverUrl, page.key);
+}
+
+async function retrieveRecord(page, config, fetchImpl) {
+  const response = await request(config, `/discussion-bridge/v1/bridge-records/${encodeURIComponent(page.resource_id)}.json`, { method: "GET" }, fetchImpl);
+  const payload = await boundedJson(response, config.maxResponseBytes);
+  const record = payload.bridge_record;
+  if (!response.ok || !record || record.direction !== "from_discourse" || record.state !== "healthy" || resourceId(record.resource_id) !== page.resource_id) {
+    throw new Error(`Hugo From Discourse record ${page.key} is unavailable.`);
+  }
+  const identity = presentationIdentity(record, config.serverUrl, page.key);
+  const content = sanitizeHtml(bounded(record.content_html, 65_536, `${page.key} record HTML`), {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]),
+    allowedAttributes: { a: ["href", "title", "rel"], img: ["src", "alt", "title", "width", "height"], code: ["class"], pre: ["class"] },
+    allowedSchemes: ["https"], allowProtocolRelative: false
+  });
+  if (!content.trim()) throw new Error(`Hugo From Discourse record ${page.key} sanitized to empty content.`);
+  return { ...identity, title: bounded(record.title, 1024, `${page.key} record title`), content_html: content };
+}
+
+async function request(config, pathname, init, fetchImpl) {
+  const base = serviceBase(config.serverUrl); const endpoint = new URL(pathname, base);
+  const response = await fetchImpl(endpoint, { ...init, redirect: "error", signal: AbortSignal.timeout(config.timeoutMs), headers: {
+    Accept: "application/json", ...(init.body ? { "content-type": "application/json" } : {}),
+    "X-DiscussionBridge-Connection": config.connectionId, "X-DiscussionBridge-Secret": config.connectionSecret
+  }});
+  if (response.url && new URL(response.url).origin !== base.origin) throw new Error("DiscussionBridge response changed service origin.");
+  return response;
+}
+
+function presentationIdentity(value, serverUrl, key) {
+  const id = resourceId(value.resource_id); const topicId = value.topic_id;
+  if (!Number.isSafeInteger(topicId) || topicId <= 0) throw new Error(`${key} returned an invalid topic ID.`);
+  const topic = new URL(bounded(value.topic_url, 2048, `${key} topic URL`));
+  const base = serviceBase(serverUrl);
+  if (topic.origin !== base.origin || !new RegExp(`/t/(?:[^/]+/)?${topicId}(?:/|$)`).test(topic.pathname)) throw new Error(`${key} returned an inconsistent topic URL.`);
+  return { resource_id: id, topic_id: topicId, topic_url: topic.href, forum_origin: base.origin };
+}
+
+function validateConfig(config) {
+  serviceBase(config.serverUrl);
+  if (!CONNECTION.test(config.connectionId)) throw new Error("DiscussionBridge connection ID is invalid.");
+  if (typeof config.connectionSecret !== "string" || config.connectionSecret.length < 32 || config.connectionSecret.length > 256) throw new Error("DiscussionBridge connection secret is invalid.");
+  config.timeoutMs ??= 15_000; config.maxResponseBytes ??= 65_536;
+  if (!Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 1 || config.timeoutMs > 600_000) throw new Error("DiscussionBridge timeout is invalid.");
+  if (!Number.isSafeInteger(config.maxResponseBytes) || config.maxResponseBytes < 1 || config.maxResponseBytes > 1_048_576) throw new Error("DiscussionBridge response bound is invalid.");
+  if (config.lane !== undefined) bounded(config.lane, 64, "lane");
+}
+
+function serviceBase(value) { const url = new URL(value); if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error("DiscussionBridge server URL must be HTTPS."); url.pathname = "/"; return url; }
+function resourceId(value) { if (typeof value !== "string" || !UUID.test(value)) throw new Error("DiscussionBridge resource ID is invalid."); return value.toLowerCase(); }
+function bounded(value, max, label) { if (typeof value !== "string" || !value.trim() || enc.encode(value).byteLength > max || /[\u0000-\u001f\u007f]/u.test(value)) throw new Error(`${label} is invalid.`); return value.trim(); }
+function validateAuthors(value) { if (value === undefined) return []; if (!Array.isArray(value) || value.length > 20) throw new Error("Hugo source authors are invalid."); return value.map((a) => ({ id: bounded(a?.id, 255, "author ID"), name: bounded(a?.name, 200, "author name") })); }
+function cleanSourceHtml(value) { const withoutPresentation = value.replace(/<section[^>]+class="discussionbridge-presentation"[\s\S]*?<\/section>/giu, ""); const clean = sanitizeHtml(withoutPresentation, { allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2"]), allowedAttributes: { a: ["href", "title"], img: ["src", "alt", "title", "width", "height"], code: ["class"], pre: ["class"] }, allowedSchemes: ["https"], allowProtocolRelative: false }); if (!clean.trim()) throw new Error("Hugo source content is empty after sanitization."); return clean; }
+async function boundedJson(response, maximum) { const declared = Number(response.headers.get("content-length")); if (Number.isFinite(declared) && declared > maximum) throw new Error("DiscussionBridge response is too large."); const type = response.headers.get("content-type") ?? ""; if (!/^application\/json\b/i.test(type)) throw new Error("DiscussionBridge response is not JSON."); const text = await response.text(); if (enc.encode(text).byteLength > maximum) throw new Error("DiscussionBridge response is too large."); const value = JSON.parse(text); if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("DiscussionBridge response JSON is invalid."); return value; }
+async function atomicWrite(file, contents) { const temp = path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`); let handle; try { handle = await open(temp, "wx"); await handle.writeFile(contents, "utf8"); await handle.sync(); await handle.close(); handle = undefined; await rename(temp, file); } catch (error) { await handle?.close().catch(() => {}); await rm(temp, { force: true }).catch(() => {}); throw error; } }
