@@ -8,6 +8,8 @@ const CONNECTION = /^dbc_[a-f0-9]{24}$/;
 const KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MODES = new Set(["simple", "full", "to_discourse", "from_discourse"]);
 const enc = new TextEncoder();
+const BRANDING_CACHE_MS = 10 * 60 * 1000;
+const brandingCache = new Map();
 
 export async function syncNativePublications({ contentDir, siteUrl, config, fetchImpl = fetch }) {
   validateConfig(config);
@@ -121,7 +123,11 @@ export function preflight(manifest, config) {
 
 async function retrieveSimple(page, config, fetchImpl) {
   const base = serviceBase(config.serverUrl);
-  const topic = await publicJson(new URL(`/t/${page.topic_id}.json`, base), config, fetchImpl);
+  const [topic, poweredBy, wordmark] = await Promise.all([
+    publicJson(new URL(`/t/${page.topic_id}.json`, base), config, fetchImpl),
+    publicPoweredByDiscourse(base, config, fetchImpl).catch(() => false),
+    readFile(new URL("../assets/discourse-wordmark.svg", import.meta.url), "utf8"),
+  ]);
   const stream = topic?.post_stream?.stream;
   const initial = topic?.post_stream?.posts;
   if (!Array.isArray(stream) || !Array.isArray(initial)) throw new Error(`Hugo Simple topic ${page.key} is invalid.`);
@@ -143,7 +149,38 @@ async function retrieveSimple(page, config, fetchImpl) {
   const topicUrl = new URL(`/t/${slug}/${page.topic_id}`, base).href;
   const replies = ids.map((id) => simpleReply(byId.get(id), topicUrl, base)).filter(Boolean);
   return { topic_id: page.topic_id, topic_url: topicUrl, forum_origin: base.origin,
-    simple_html: simpleMarkup(replies, topicUrl, stream.length - 1 > 50) };
+    simple_html: simpleMarkup(replies, topicUrl, stream.length - 1 > 50, poweredBy, wordmark) };
+}
+
+async function publicPoweredByDiscourse(base, config, fetchImpl) {
+  const now = Date.now();
+  const cached = brandingCache.get(base.origin);
+  if (cached && cached.expiresAt > now) return cached.value;
+  const value = readPublicPoweredByDiscourse(base, config, fetchImpl);
+  brandingCache.set(base.origin, { expiresAt: now + BRANDING_CACHE_MS, value });
+  try { return await value; } catch (error) { brandingCache.delete(base.origin); throw error; }
+}
+
+async function readPublicPoweredByDiscourse(base, config, fetchImpl) {
+  const response = await fetchImpl(new URL("/", base), {
+    method: "GET",
+    redirect: "error",
+    signal: AbortSignal.timeout(config.timeoutMs),
+    headers: {
+      Accept: "text/html",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    },
+  });
+  if (response.url && new URL(response.url).origin !== base.origin) throw new Error("Discourse branding response changed service origin.");
+  if (!response.ok || !(response.headers.get("content-type") ?? "").toLowerCase().startsWith("text/html")) throw new Error("Discourse branding response is invalid.");
+  const text = await response.text();
+  if (enc.encode(text).byteLength > 512 * 1024) throw new Error("Discourse branding response is too large.");
+  const match = /<script[^>]+id=["']data-preloaded["'][^>]*>([\s\S]*?)<\/script>/iu.exec(text);
+  if (!match) throw new Error("Discourse branding setting is unavailable.");
+  let outer, settings;
+  try { outer = JSON.parse(match[1]); settings = JSON.parse(outer.siteSettings); } catch { throw new Error("Discourse branding setting is invalid."); }
+  if (typeof settings?.enable_powered_by_discourse !== "boolean") throw new Error("Discourse branding setting is invalid.");
+  return settings.enable_powered_by_discourse;
 }
 
 async function publicJson(url, config, fetchImpl) {
@@ -166,11 +203,13 @@ function simpleReply(post, topicUrl, base) {
   return `<article class="discussionbridge-simple__reply"><span class="discussionbridge-simple__avatar" aria-hidden="true">${avatar}</span><div class="discussionbridge-simple__content"><header class="discussionbridge-simple__meta"><strong>${escapeHtml(name)}</strong><a href="${escapeHtml(href)}" rel="nofollow noopener noreferrer"><time datetime="${escapeHtml(date.toISOString())}">${escapeHtml(date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }))}</time></a></header><div class="discussionbridge-simple__body">${body}</div></div></article>`;
 }
 
-function simpleMarkup(replies, topicUrl, truncated) {
+function simpleMarkup(replies, topicUrl, truncated, poweredBy, wordmark) {
   const initial = replies.slice(0, 5).join(""); const rest = replies.slice(5);
   const more = rest.length ? `<details class="discussionbridge-simple__more"><summary><span class="discussionbridge-simple__more-closed">Show ${rest.length} more ${rest.length === 1 ? "comment" : "comments"}</span><span class="discussionbridge-simple__more-open">Show fewer comments</span></summary>${rest.join("")}</details>` : "";
   const limit = truncated ? `<p class="discussionbridge-simple__limit">Showing the first 50 replies. <a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">View the complete discussion on The Bridge</a>.</p>` : "";
-  return `<div class="discussionbridge-simple__header"><h2>Comments</h2><a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">Open discussion</a></div>${replies.length ? initial + more : '<p class="discussionbridge-simple__empty">No comments yet.</p>'}${limit}`;
+  const attribution = `<div data-discussionbridge-attributions><a class="discussionbridge-powered-by" data-discussionbridge-powered-by href="https://www.discourse.org/powered-by" aria-label="Powered by Discourse" rel="nofollow noopener noreferrer"${poweredBy ? "" : " hidden"}><span>Powered by</span><span class="discussionbridge-powered-by__wordmark">${wordmark}</span></a></div>`;
+  const styles = '<style>.discussionbridge-powered-by{display:flex;align-items:center;justify-content:center;gap:.45rem;margin:.8rem auto 0;color:inherit;font-size:.8rem;text-decoration:none;opacity:.72}.discussionbridge-powered-by[hidden]{display:none}.discussionbridge-powered-by__wordmark{display:inline-flex;width:6.4rem;padding:.12rem .28rem;border-radius:.2rem;background:#fff}.discussionbridge-powered-by__wordmark svg{display:block;width:100%;height:auto}</style>';
+  return `<div class="discussionbridge-simple__header"><h2>Comments</h2><a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">Open discussion</a></div>${replies.length ? initial + more : '<p class="discussionbridge-simple__empty">No comments yet.</p>'}${limit}${attribution}${styles}`;
 }
 
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]); }

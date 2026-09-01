@@ -25,14 +25,20 @@ test("prepare resolves and retrieves then writes only nonsecret presentation sta
   const requests = [];
   const fetchImpl = async (url, init) => {
     requests.push({ url: String(url), init });
+    if (new URL(url).pathname === "/") {
+      const settings = JSON.stringify({ enable_powered_by_discourse: true });
+      const preload = JSON.stringify({ siteSettings: settings });
+      return new Response(`<script type="application/json" id="data-preloaded">${preload}</script>`, { status: 200, headers: { "content-type": "text/html" } });
+    }
     if (init.method === "POST") return new Response(JSON.stringify({ outcome: "created", core_fallback: false, direction: "to_discourse", resource_id: "22222222-2222-4222-8222-222222222222", topic_id: 21, topic_url: "https://bridge.example.com/t/to-bridge/21" }), { status: 201, headers: { "content-type": "application/json" } });
     if (String(url).includes("/t/23.json")) return new Response(JSON.stringify({ slug: "simple", post_stream: { stream: [230, 231], posts: [{ id: 230, post_number: 1, username: "author", created_at: "2026-08-31T00:00:00Z", cooked: "<p>First post</p>" }, { id: 231, post_number: 2, username: "doc-bot", name: "Doc Bot", created_at: "2026-08-31T01:00:00Z", cooked: "<p>Helpful reply.</p>", avatar_template: "/letter_avatar_proxy/v4/letter/d/{size}.png" }] } }), { status: 200, headers: { "content-type": "application/json" } });
     return new Response(JSON.stringify({ bridge_record: { resource_id: "11111111-1111-4111-8111-111111111111", direction: "from_discourse", state: "healthy", title: "Forum article", topic_id: 22, topic_url: "https://bridge.example.com/t/from-bridge/22", content_html: "<h2>Forum owned</h2><script>bad()</script><p>Safe.</p>" } }), { status: 200, headers: { "content-type": "application/json" } });
   };
   const result = await prepare({ manifestPath, outputPath, config: { ...config }, fetchImpl });
   assert.deepEqual(result, { pages: 3, records: 3 });
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 4);
   assert.equal(requests.every((r) => r.init.redirect === "error"), true);
+  assert.match(requests.find((r) => new URL(r.url).pathname === "/").init.headers["User-Agent"], /^Mozilla\/5\.0/);
   const requestBody = JSON.parse(requests.find((r) => r.init.method === "POST").init.body).bridge_record;
   assert.match(requestBody.external_id, /^hugo-page:[0-9a-f]{64}$/);
   assert.equal(Object.hasOwn(requestBody, "visibility"), false);
@@ -42,6 +48,8 @@ test("prepare resolves and retrieves then writes only nonsecret presentation sta
   assert.doesNotMatch(output, /script|bad\(\)/);
   assert.match(output, /Forum owned/);
   assert.match(output, /Helpful reply/);
+  assert.match(output, /Powered by Discourse/);
+  assert.match(output, /discussionbridge-powered-by__wordmark/);
   assert.doesNotMatch(output, /First post/);
 });
 
