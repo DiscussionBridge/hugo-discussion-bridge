@@ -25,7 +25,7 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
         const item = nativePublication(record, site.origin, config.serverUrl);
         if (!item) { summary.skipped++; continue; }
         const file = path.join(contentDir, "discussionbridge", `${item.slug}.md`);
-        const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(`Published from The Bridge by ${item.authorName}.`)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n\nPublished from [The Bridge](${item.topicUrl}).\n\nSource author: ${item.authorName} · Revision ${item.revision} · Hugo 0.165.0 · DiscussionBridge for Hugo 0.1.0-alpha.5\n`;
+        const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(`Published from The Bridge by ${item.authorName}.`)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n\nPublished from [The Bridge](${item.topicUrl}).\n\nSource author: ${item.authorName} · Revision ${item.revision} · Hugo 0.165.0 · DiscussionBridge for Hugo 0.1.0-alpha.6\n`;
         let prior = null;
         try { prior = await readFile(file, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
         if (prior === output) { summary.unchanged++; continue; }
@@ -178,8 +178,8 @@ async function resolvePage(page, config, fetchImpl) {
   const body = { bridge_record: {
     direction: "to_discourse", external_id: page.external_id, canonical_url: page.canonical_url,
     title: page.title, content_html: page.content_html, published: true,
-    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.5",
-    visibility: "unlisted", correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
+    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.6",
+    correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
     ...(page.source_authors?.length ? { source_authors: page.source_authors, primary_source_author_id: page.primary_source_author_id } : {})
   }};
   const response = await request(config, "/discussion-bridge/v1/bridge-records/resolve.json", { method: "POST", body: JSON.stringify(body) }, fetchImpl);
