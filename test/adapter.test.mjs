@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { prepare, preflight, syncNativePublications } from "../src/adapter.mjs";
+import { PRODUCT_VERSION } from "../src/version.mjs";
 
 const config = { serverUrl: "https://bridge.example.com", connectionId: "dbc_0123456789abcdef01234567", connectionSecret: "s".repeat(48), lane: "hugo-demo" };
 const manifest = { site_origin: "https://hugo.example.com", pages: [
@@ -11,6 +12,14 @@ const manifest = { site_origin: "https://hugo.example.com", pages: [
   { key: "from-bridge", mode: "from_discourse", canonical_url: "https://hugo.example.com/from/", title: "From Bridge", resource_id: "11111111-1111-4111-8111-111111111111" },
   { key: "simple", mode: "simple", canonical_url: "https://hugo.example.com/simple/", title: "Simple", topic_id: 23 }
 ] };
+
+test("package and runtime versions are identical", async () => {
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const lock = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
+  assert.equal(pkg.version, PRODUCT_VERSION);
+  assert.equal(lock.version, PRODUCT_VERSION);
+  assert.equal(lock.packages[""].version, PRODUCT_VERSION);
+});
 
 test("whole-corpus preflight is deterministic and rejects collisions", () => {
   assert.deepEqual(preflight(manifest, { ...config }).map((p) => p.key), ["from-bridge", "simple", "to-bridge"]);
@@ -98,7 +107,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.9"/);
+  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.12"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });

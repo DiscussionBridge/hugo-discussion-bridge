@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import sanitizeHtml from "sanitize-html";
+import { PRODUCT_VERSION } from "./version.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CONNECTION = /^dbc_[a-f0-9]{24}$/;
@@ -28,7 +29,7 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
         if (!item) { summary.skipped++; continue; }
         const file = path.join(contentDir, "discussionbridge", `${item.slug}.md`);
         const publicationSummary = `Published from The Bridge by ${item.authorName}.`;
-        const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(publicationSummary)}\nsummary = ${JSON.stringify(publicationSummary)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_author = ${JSON.stringify(item.authorName)}\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_adapter_version = "0.1.0-alpha.9"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n`;
+        const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(publicationSummary)}\nsummary = ${JSON.stringify(publicationSummary)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_author = ${JSON.stringify(item.authorName)}\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_adapter_version = "${PRODUCT_VERSION}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n`;
         let prior = null;
         try { prior = await readFile(file, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
         if (prior === output) { summary.unchanged++; continue; }
@@ -218,7 +219,7 @@ async function resolvePage(page, config, fetchImpl) {
   const body = { bridge_record: {
     direction: "to_discourse", external_id: page.external_id, canonical_url: page.canonical_url,
     title: page.title, content_html: page.content_html, published: true,
-    adapter_id: "hugo-discussion-bridge", adapter_version: "0.1.0-alpha.9",
+    adapter_id: "hugo-discussion-bridge", adapter_version: PRODUCT_VERSION,
     correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
     ...(page.source_authors?.length ? { source_authors: page.source_authors, primary_source_author_id: page.primary_source_author_id } : {})
   }};
