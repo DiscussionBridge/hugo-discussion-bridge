@@ -1,6 +1,6 @@
 {
   "name": "hugo-discussion-bridge",
-  "version": "0.1.0-alpha.12",
+  "version": "0.1.0-alpha.13",
   "description": "Build-time DiscussionBridge adapter for Hugo",
   "type": "module",
   "bin": { "discussionbridge-hugo": "./src/cli.mjs" },
@@ -11,6 +11,6 @@
     "prepack": "npm run build"
   },
   "engines": { "node": ">=22" },
-  "dependencies": { "dompurify": "3.2.7", "sanitize-html": "2.17.0" },
+  "dependencies": { "dompurify": "3.4.14", "sanitize-html": "2.17.7" },
   "devDependencies": { "esbuild": "0.25.9" }
 }

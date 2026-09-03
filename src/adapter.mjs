@@ -270,11 +270,11 @@ function presentationIdentity(value, serverUrl, key) {
 function validateConfig(config) {
   serviceBase(config.serverUrl);
   if (!CONNECTION.test(config.connectionId)) throw new Error("DiscussionBridge connection ID is invalid.");
-  if (typeof config.connectionSecret !== "string" || config.connectionSecret.length < 32 || config.connectionSecret.length > 256) throw new Error("DiscussionBridge connection secret is invalid.");
+  if (typeof config.connectionSecret !== "string" || enc.encode(config.connectionSecret).byteLength < 32 || enc.encode(config.connectionSecret).byteLength > 256 || /[\u0000-\u001f\u007f]/u.test(config.connectionSecret)) throw new Error("DiscussionBridge connection secret is invalid.");
   config.timeoutMs ??= 15_000; config.maxResponseBytes ??= 65_536;
   if (!Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 1 || config.timeoutMs > 600_000) throw new Error("DiscussionBridge timeout is invalid.");
   if (!Number.isSafeInteger(config.maxResponseBytes) || config.maxResponseBytes < 1 || config.maxResponseBytes > 1_048_576) throw new Error("DiscussionBridge response bound is invalid.");
-  if (config.lane !== undefined) bounded(config.lane, 64, "lane");
+  if (config.lane !== undefined && !/^[a-z0-9][a-z0-9_-]{0,63}$/u.test(config.lane)) throw new Error("DiscussionBridge lane is invalid.");
 }
 
 function serviceBase(value) { const url = new URL(value); if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error("DiscussionBridge server URL must be HTTPS."); url.pathname = "/"; return url; }

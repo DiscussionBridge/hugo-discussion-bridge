@@ -25,6 +25,10 @@ test("whole-corpus preflight is deterministic and rejects collisions", () => {
   assert.deepEqual(preflight(manifest, { ...config }).map((p) => p.key), ["from-bridge", "simple", "to-bridge"]);
   const collision = structuredClone(manifest); collision.pages[1].canonical_url = collision.pages[0].canonical_url;
   assert.throws(() => preflight(collision, { ...config }), /Duplicate canonical URL/);
+  assert.throws(() => preflight(manifest, { ...config, connectionSecret: "s".repeat(31) }), /connection secret/);
+  assert.throws(() => preflight(manifest, { ...config, connectionSecret: "é".repeat(129) }), /connection secret/);
+  assert.throws(() => preflight(manifest, { ...config, connectionSecret: `${"s".repeat(32)}\n` }), /connection secret/);
+  assert.throws(() => preflight(manifest, { ...config, lane: "Bad Lane" }), /lane/);
 });
 
 test("prepare resolves and retrieves then writes only nonsecret presentation state", async () => {
@@ -107,7 +111,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.12"/);
+  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.13"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });
