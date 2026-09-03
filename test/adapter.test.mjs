@@ -167,6 +167,38 @@ test("an interruption after remote success leaves pending state until output com
   assert.equal(Object.values(recovered.operations)[0].attempts, 2);
 });
 
+test("overlapping prepares fail closed on the shared state file", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-concurrent-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const manifestPath = path.join(dir, "manifest.json");
+  const outputPath = path.join(dir, "records.json");
+  const statePath = path.join(dir, "publication-state.json");
+  await writeFile(manifestPath, JSON.stringify({ site_origin: "https://hugo.example.com", pages: [manifest.pages[0]] }));
+  let releaseFirst;
+  const release = new Promise((resolve) => { releaseFirst = resolve; });
+  let staged;
+  const stagedReached = new Promise((resolve) => { staged = resolve; });
+  let requests = 0;
+  const fetchImpl = async () => {
+    requests++;
+    return new Response(JSON.stringify({ outcome: "created", core_fallback: false, direction: "to_discourse", resource_id: "22222222-2222-4222-8222-222222222222", topic_id: 21, topic_url: "https://bridge.example.com/t/to-bridge/21" }), { status: 201, headers: { "content-type": "application/json" } });
+  };
+  const first = prepare({
+    manifestPath, outputPath, statePath, config: { ...config }, fetchImpl,
+    dependencies: { afterResultStaged: async () => { staged(); await release; } },
+  });
+  await stagedReached;
+  await assert.rejects(
+    () => prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl }),
+    /publication state is already in use/,
+  );
+  releaseFirst();
+  await first;
+  assert.equal(requests, 1);
+  assert.equal(Object.values((await readOperationalState(statePath)).operations)[0].outcome, "created");
+  await assert.rejects(() => readFile(`${statePath}.lock`), /ENOENT/);
+});
+
 test("invalid later page prevents every request and output write", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-"));
   const manifestPath = path.join(dir, "manifest.json"); const outputPath = path.join(dir, "records.json");
@@ -212,7 +244,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.15"/);
+  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.16"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });

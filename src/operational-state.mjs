@@ -27,6 +27,24 @@ export async function writeOperationalState(file, state) {
   }
 }
 
+export async function withOperationalStateLock(file, action) {
+  await mkdir(path.dirname(file), { recursive: true });
+  const lockFile = `${file}.lock`;
+  let handle;
+  try {
+    handle = await open(lockFile, "wx", 0o600);
+  } catch (error) {
+    if (error.code === "EEXIST") throw new Error(`Hugo publication state is already in use: ${file}`);
+    throw error;
+  }
+  try {
+    return await action();
+  } finally {
+    await handle.close();
+    await rm(lockFile, { force: true });
+  }
+}
+
 export function beginAttempt(state, { externalId, canonicalUrl }, now = new Date()) {
   const prior = state.operations[externalId];
   if (prior && prior.canonicalUrl !== canonicalUrl) throw new Error("Hugo operational state contains a canonical identity collision.");

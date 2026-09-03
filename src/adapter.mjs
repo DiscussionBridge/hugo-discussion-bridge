@@ -3,7 +3,7 @@ import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import sanitizeHtml from "sanitize-html";
 import { PRODUCT_VERSION } from "./version.mjs";
-import { beginAttempt, completeAttempt, failAttempt, readOperationalState, stageAttemptResult, writeOperationalState } from "./operational-state.mjs";
+import { beginAttempt, completeAttempt, failAttempt, readOperationalState, stageAttemptResult, withOperationalStateLock, writeOperationalState } from "./operational-state.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CONNECTION = /^dbc_[a-f0-9]{24}$/;
@@ -83,6 +83,10 @@ function nativePublication(record, siteOrigin, serverUrl) {
 }
 
 export async function prepare({ manifestPath, outputPath, statePath = path.join(path.dirname(outputPath), ".discussionbridge-hugo-publication-state.json"), config, fetchImpl = fetch, dependencies = {} }) {
+  return withOperationalStateLock(statePath, () => prepareUnlocked({ manifestPath, outputPath, statePath, config, fetchImpl, dependencies }));
+}
+
+async function prepareUnlocked({ manifestPath, outputPath, statePath, config, fetchImpl, dependencies }) {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const pages = preflight(manifest, config);
   const operationalState = await readOperationalState(statePath);
