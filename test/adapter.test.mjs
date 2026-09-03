@@ -133,7 +133,7 @@ test("native publication creates once, retries unchanged, and skips presentation
     bindings: [{ role: "presentation", state: "active", canonical_url: "https://hugo.example.com/discussionbridge/the-bridge-publishes-everywhere/", native_materialization: true }],
   };
   const presentationOnly = { ...source, resource_id: "44444444-4444-4444-8444-444444444444", bindings: [{ ...source.bindings[0], native_materialization: false }] };
-  const fetchImpl = async () => new Response(JSON.stringify({ bridge_records: [presentationOnly, source], pagination: { page: 1, pages: 1 } }), { status: 200, headers: { "content-type": "application/json" } });
+  const fetchImpl = async () => new Response(JSON.stringify({ bridge_records: [presentationOnly, source], pagination: { page: 1, pages: 1, total: 2, snapshot: "snapshot-one" } }), { status: 200, headers: { "content-type": "application/json" } });
   const options = { contentDir: dir, siteUrl: "https://hugo.example.com/", config: { ...config }, fetchImpl };
   assert.deepEqual(await syncNativePublications(options), { created: 1, updated: 0, unchanged: 0, skipped: 1, failed: 0 });
   assert.deepEqual(await syncNativePublications(options), { created: 0, updated: 0, unchanged: 1, skipped: 1, failed: 0 });
@@ -147,6 +147,27 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.14"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
+});
+
+test("native publication rejects snapshot drift and duplicate feed identities", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-feed-"));
+  const source = {
+    resource_id: "33333333-3333-4333-8333-333333333333", direction: "from_discourse", state: "healthy", title: "Publisher", topic_id: 53, topic_url: "https://bridge.example.com/t/publisher/53",
+    source: { platform: "discourse", origin: "https://bridge.example.com", topic_id: 53, post_id: 149, post_number: 1, post_version: 1, revision: "post:149:version:1", updated_at: "2026-09-01T06:57:52.495021Z", author: { name: "DiscussionBridge", profile_url: "https://bridge.example.com/u/discussionbridge" } },
+    bindings: [{ role: "presentation", state: "active", canonical_url: "https://hugo.example.com/discussionbridge/publisher/", native_materialization: true }],
+  };
+  let page = 0;
+  const drifting = async () => {
+    page++;
+    return new Response(JSON.stringify({ bridge_records: [source], pagination: { page, pages: 2, total: 2, snapshot: page === 1 ? "one" : "two" } }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  await assert.rejects(() => syncNativePublications({ contentDir: dir, siteUrl: "https://hugo.example.com/", config: { ...config }, fetchImpl: drifting }), /changed during synchronization/);
+  page = 0;
+  const repeated = async () => {
+    page++;
+    return new Response(JSON.stringify({ bridge_records: [source], pagination: { page, pages: 2, total: 2, snapshot: "one" } }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  await assert.rejects(() => syncNativePublications({ contentDir: dir, siteUrl: "https://hugo.example.com/", config: { ...config }, fetchImpl: repeated }), /duplicate resource identity/);
 });
 
 test("browser Simple loader is credential-free, bounded, sanitized, and preserves a snapshot fallback", async () => {

@@ -19,12 +19,24 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
   if (site.protocol !== "https:" || site.username || site.password || site.pathname !== "/" || site.search || site.hash) throw new Error("Hugo site URL must be an HTTPS origin.");
   const summary = { created: 0, updated: 0, unchanged: 0, skipped: 0, failed: 0 };
   let page = 1;
+  let snapshot; let expectedPages; let expectedTotal;
+  const seenResources = new Set();
   for (;;) {
-    const response = await request(config, `/discussion-bridge/v1/bridge-records.json?page=${page}`, { method: "GET" }, fetchImpl);
+    const query = new URLSearchParams({ page: String(page) });
+    if (snapshot) query.set("snapshot", snapshot);
+    const response = await request(config, `/discussion-bridge/v1/bridge-records.json?${query}`, { method: "GET" }, fetchImpl);
     const payload = await boundedJson(response, Math.min(config.maxResponseBytes * 4, 262_144));
     if (!response.ok || !Array.isArray(payload.bridge_records) || !payload.pagination || typeof payload.pagination !== "object") throw new Error("DiscussionBridge publication feed is invalid.");
-    if (payload.pagination.page !== page || !Number.isSafeInteger(payload.pagination.pages) || payload.pagination.pages < 1 || payload.pagination.pages > 10_000) throw new Error("DiscussionBridge publication pagination is invalid.");
+    if (payload.pagination.page !== page || !Number.isSafeInteger(payload.pagination.pages) || payload.pagination.pages < 1 || payload.pagination.pages > 10_000 || !Number.isSafeInteger(payload.pagination.total) || payload.pagination.total < 0 || typeof payload.pagination.snapshot !== "string" || !payload.pagination.snapshot || payload.pagination.snapshot.length > 8_192) throw new Error("DiscussionBridge publication pagination is invalid.");
+    if (page === 1) {
+      snapshot = payload.pagination.snapshot; expectedPages = payload.pagination.pages; expectedTotal = payload.pagination.total;
+    } else if (payload.pagination.snapshot !== snapshot || payload.pagination.pages !== expectedPages || payload.pagination.total !== expectedTotal) {
+      throw new Error("DiscussionBridge publication feed changed during synchronization.");
+    }
     for (const record of payload.bridge_records) {
+      const feedResourceId = resourceId(record?.resource_id);
+      if (seenResources.has(feedResourceId)) throw new Error("DiscussionBridge publication feed contains a duplicate resource identity.");
+      seenResources.add(feedResourceId);
       try {
         const item = nativePublication(record, site.origin, config.serverUrl);
         if (!item) { summary.skipped++; continue; }
@@ -43,6 +55,7 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
     if (page >= payload.pagination.pages) break;
     page++;
   }
+  if (seenResources.size !== expectedTotal) throw new Error("DiscussionBridge publication feed did not produce its complete unique census.");
   return summary;
 }
 
