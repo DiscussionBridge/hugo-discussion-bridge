@@ -53,6 +53,17 @@ export function completeAttempt(operation, result, now = new Date()) {
   delete operation.lastError;
 }
 
+export function stageAttemptResult(operation, result) {
+  operation.outcome = "pending";
+  operation.retryable = true;
+  operation.reconciliationRequired = true;
+  operation.resourceId = result.resource_id;
+  operation.topicId = result.topic_id;
+  operation.topicUrl = result.topic_url;
+  operation.lastError = "Receiver accepted the publication; platform output commit is pending.";
+  delete operation.lastSuccessAt;
+}
+
 export function failAttempt(operation, error, { retryable, reconciliationRequired }) {
   operation.outcome = reconciliationRequired ? "reconciliation_required" : retryable ? "retryable_failure" : "rejected";
   operation.retryable = retryable;

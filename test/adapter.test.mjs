@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -99,6 +99,74 @@ test("publish state survives an ambiguous failure and exact retry reuses correla
   assert.doesNotMatch(JSON.stringify(recovered), new RegExp(config.connectionSecret));
 });
 
+test("a failed final output commit remains non-healthy and retries the same identity", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-output-failure-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const manifestPath = path.join(dir, "manifest.json");
+  const outputPath = path.join(dir, "records.json");
+  const statePath = path.join(dir, "publication-state.json");
+  await writeFile(manifestPath, JSON.stringify({ site_origin: "https://hugo.example.com", pages: [manifest.pages[0]] }));
+  const correlations = [];
+  let requests = 0;
+  const fetchImpl = async (_url, init) => {
+    correlations.push(JSON.parse(init.body).bridge_record.correlation_id);
+    requests++;
+    return new Response(JSON.stringify({ outcome: requests === 1 ? "created" : "resolved", core_fallback: false, direction: "to_discourse", resource_id: "22222222-2222-4222-8222-222222222222", topic_id: 21, topic_url: "https://bridge.example.com/t/to-bridge/21" }), { status: requests === 1 ? 201 : 200, headers: { "content-type": "application/json" } });
+  };
+  await assert.rejects(() => prepare({
+    manifestPath, outputPath, statePath, config: { ...config }, fetchImpl,
+    dependencies: { atomicWrite: async () => { throw new Error("injected final output rename failure"); } },
+  }), /injected final output rename failure/);
+  await assert.rejects(() => readFile(outputPath), /ENOENT/);
+  const failed = await readOperationalState(statePath);
+  const failedOperation = Object.values(failed.operations)[0];
+  assert.equal(failedOperation.outcome, "reconciliation_required");
+  assert.equal(failedOperation.retryable, true);
+  assert.equal(summarizeOperationalState(failed).healthy, 0);
+
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  const recovered = await readOperationalState(statePath);
+  const recoveredOperation = Object.values(recovered.operations)[0];
+  assert.equal(correlations[0], correlations[1]);
+  assert.equal(recoveredOperation.outcome, "resolved");
+  assert.equal(recoveredOperation.attempts, 2);
+  assert.equal(recoveredOperation.reconciliationRequired, false);
+  assert.match(await readFile(outputPath, "utf8"), /22222222-2222-4222-8222-222222222222/);
+});
+
+test("an interruption after remote success leaves pending state until output commits", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-interruption-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const manifestPath = path.join(dir, "manifest.json");
+  const outputPath = path.join(dir, "records.json");
+  const statePath = path.join(dir, "publication-state.json");
+  await writeFile(manifestPath, JSON.stringify({ site_origin: "https://hugo.example.com", pages: [manifest.pages[0]] }));
+  const correlations = [];
+  let requests = 0;
+  const fetchImpl = async (_url, init) => {
+    correlations.push(JSON.parse(init.body).bridge_record.correlation_id);
+    requests++;
+    return new Response(JSON.stringify({ outcome: requests === 1 ? "created" : "resolved", core_fallback: false, direction: "to_discourse", resource_id: "22222222-2222-4222-8222-222222222222", topic_id: 21, topic_url: "https://bridge.example.com/t/to-bridge/21" }), { status: requests === 1 ? 201 : 200, headers: { "content-type": "application/json" } });
+  };
+  await assert.rejects(() => prepare({
+    manifestPath, outputPath, statePath, config: { ...config }, fetchImpl,
+    dependencies: { afterResultStaged: async () => { throw new Error("simulated process interruption"); } },
+  }), /simulated process interruption/);
+  await assert.rejects(() => readFile(outputPath), /ENOENT/);
+  const interrupted = await readOperationalState(statePath);
+  const interruptedOperation = Object.values(interrupted.operations)[0];
+  assert.equal(interruptedOperation.outcome, "pending");
+  assert.equal(interruptedOperation.retryable, true);
+  assert.equal(interruptedOperation.reconciliationRequired, true);
+  assert.equal(summarizeOperationalState(interrupted).healthy, 0);
+
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  const recovered = await readOperationalState(statePath);
+  assert.equal(correlations[0], correlations[1]);
+  assert.equal(Object.values(recovered.operations)[0].outcome, "resolved");
+  assert.equal(Object.values(recovered.operations)[0].attempts, 2);
+});
+
 test("invalid later page prevents every request and output write", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-"));
   const manifestPath = path.join(dir, "manifest.json"); const outputPath = path.join(dir, "records.json");
@@ -144,7 +212,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.14"/);
+  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.15"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });

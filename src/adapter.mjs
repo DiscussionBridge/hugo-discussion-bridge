@@ -3,7 +3,7 @@ import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import sanitizeHtml from "sanitize-html";
 import { PRODUCT_VERSION } from "./version.mjs";
-import { beginAttempt, completeAttempt, failAttempt, readOperationalState, writeOperationalState } from "./operational-state.mjs";
+import { beginAttempt, completeAttempt, failAttempt, readOperationalState, stageAttemptResult, writeOperationalState } from "./operational-state.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CONNECTION = /^dbc_[a-f0-9]{24}$/;
@@ -82,11 +82,12 @@ function nativePublication(record, siteOrigin, serverUrl) {
   return { resourceId: id, slug: match[1], title: bounded(record.title, 1024, "Hugo publication title"), revision: source.revision, updatedAt, authorName, topicId: record.topic_id, topicUrl: identity.topic_url };
 }
 
-export async function prepare({ manifestPath, outputPath, statePath = path.join(path.dirname(outputPath), ".discussionbridge-hugo-publication-state.json"), config, fetchImpl = fetch }) {
+export async function prepare({ manifestPath, outputPath, statePath = path.join(path.dirname(outputPath), ".discussionbridge-hugo-publication-state.json"), config, fetchImpl = fetch, dependencies = {} }) {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const pages = preflight(manifest, config);
   const operationalState = await readOperationalState(statePath);
   const output = {};
+  const stagedAttempts = [];
   for (const page of pages) {
     if (page.mode === "simple" && page.topic_id) output[page.key] = await retrieveSimple(page, config, fetchImpl);
     if (page.mode === "to_discourse") {
@@ -94,17 +95,27 @@ export async function prepare({ manifestPath, outputPath, statePath = path.join(
       await writeOperationalState(statePath, operationalState);
       try {
         output[page.key] = await resolvePage(page, config, fetchImpl, operation.correlationId);
-        completeAttempt(operation, output[page.key]);
       } catch (error) {
         failAttempt(operation, error, classifyFailure(error));
         await writeOperationalState(statePath, operationalState);
         throw error;
       }
+      stageAttemptResult(operation, output[page.key]);
       await writeOperationalState(statePath, operationalState);
+      stagedAttempts.push({ operation, result: output[page.key] });
+      await dependencies.afterResultStaged?.(page.key);
     }
     if (page.mode === "from_discourse") output[page.key] = await retrieveRecord(page, config, fetchImpl);
   }
-  await atomicWrite(outputPath, `${JSON.stringify(output, null, 2)}\n`);
+  try {
+    await (dependencies.atomicWrite ?? atomicWrite)(outputPath, `${JSON.stringify(output, null, 2)}\n`);
+  } catch (error) {
+    for (const { operation } of stagedAttempts) failAttempt(operation, error, { retryable: true, reconciliationRequired: true });
+    await writeOperationalState(statePath, operationalState);
+    throw error;
+  }
+  for (const { operation, result } of stagedAttempts) completeAttempt(operation, result);
+  if (stagedAttempts.length > 0) await writeOperationalState(statePath, operationalState);
   return { pages: pages.length, records: Object.keys(output).length };
 }
 
