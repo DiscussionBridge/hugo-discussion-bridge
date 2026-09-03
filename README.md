@@ -20,13 +20,25 @@ the Hugo data directory, generated HTML, browser JavaScript, logs or errors.
 ```text
 discussionbridge-hugo prepare \
   --manifest public/discussionbridge-manifest.json \
-  --output data/discussionbridge.json
+  --output data/discussionbridge.json \
+  --state .discussionbridge/hugo-publication-state.json
 ```
 
 Required environment variables are `DISCUSSIONBRIDGE_SERVER_URL`,
 `DISCUSSIONBRIDGE_CONNECTION_ID`, and
 `DISCUSSIONBRIDGE_CONNECTION_SECRET_FILE`. Optional
 `DISCUSSIONBRIDGE_LANE` selects the connection lane.
+
+The state file is an atomic, secret-free operational ledger. It preserves the
+stable external identity and correlation across an interrupted request and
+records attempt count, outcome, retry/reconciliation status, and resolved
+resource/topic identity. A later exact build can retry without losing what the
+previous build attempted. Inspect its bounded operator summary with:
+
+```text
+discussionbridge-hugo publication-status \
+  --state .discussionbridge/hugo-publication-state.json
+```
 
 An operator may explicitly authorize The Bridge to create or update a native
 Hugo content record. Presentation-only bindings are ignored. The trusted build

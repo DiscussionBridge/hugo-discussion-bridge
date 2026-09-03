@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { prepare, preflight, syncNativePublications } from "../src/adapter.mjs";
+import { readOperationalState, summarizeOperationalState } from "../src/operational-state.mjs";
 import { PRODUCT_VERSION } from "../src/version.mjs";
 
 const config = { serverUrl: "https://bridge.example.com", connectionId: "dbc_0123456789abcdef01234567", connectionSecret: "s".repeat(48), lane: "hugo-demo" };
@@ -66,6 +67,38 @@ test("prepare resolves and retrieves then writes only nonsecret presentation sta
   assert.doesNotMatch(output, /First post/);
 });
 
+test("publish state survives an ambiguous failure and exact retry reuses correlation and identity", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-state-"));
+  const manifestPath = path.join(dir, "manifest.json");
+  const outputPath = path.join(dir, "records.json");
+  const statePath = path.join(dir, "publication-state.json");
+  const onePage = { site_origin: "https://hugo.example.com", pages: [manifest.pages[0]] };
+  await import("node:fs/promises").then(({ writeFile }) => writeFile(manifestPath, JSON.stringify(onePage)));
+  const correlations = [];
+  let attempt = 0;
+  const fetchImpl = async (_url, init) => {
+    correlations.push(JSON.parse(init.body).bridge_record.correlation_id);
+    attempt++;
+    if (attempt === 1) throw new Error("connection reset after request transmission");
+    return new Response(JSON.stringify({ outcome: "resolved", core_fallback: false, direction: "to_discourse", resource_id: "22222222-2222-4222-8222-222222222222", topic_id: 21, topic_url: "https://bridge.example.com/t/to-bridge/21" }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  await assert.rejects(() => prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl }), /connection reset/);
+  const failed = await readOperationalState(statePath);
+  const failedOperation = Object.values(failed.operations)[0];
+  assert.equal(failedOperation.outcome, "retryable_failure");
+  assert.equal(failedOperation.attempts, 1);
+  assert.deepEqual(summarizeOperationalState(failed), { operations: 1, pending: 0, healthy: 0, retryable: 1, reconciliationRequired: 0, rejected: 0 });
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  const recovered = await readOperationalState(statePath);
+  const operation = Object.values(recovered.operations)[0];
+  assert.equal(operation.outcome, "resolved");
+  assert.equal(operation.attempts, 2);
+  assert.equal(operation.resourceId, "22222222-2222-4222-8222-222222222222");
+  assert.equal(operation.topicId, 21);
+  assert.equal(correlations[0], correlations[1]);
+  assert.doesNotMatch(JSON.stringify(recovered), new RegExp(config.connectionSecret));
+});
+
 test("invalid later page prevents every request and output write", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-"));
   const manifestPath = path.join(dir, "manifest.json"); const outputPath = path.join(dir, "records.json");
@@ -111,7 +144,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.13"/);
+  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.14"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });

@@ -3,6 +3,7 @@ import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import sanitizeHtml from "sanitize-html";
 import { PRODUCT_VERSION } from "./version.mjs";
+import { beginAttempt, completeAttempt, failAttempt, readOperationalState, writeOperationalState } from "./operational-state.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CONNECTION = /^dbc_[a-f0-9]{24}$/;
@@ -68,13 +69,26 @@ function nativePublication(record, siteOrigin, serverUrl) {
   return { resourceId: id, slug: match[1], title: bounded(record.title, 1024, "Hugo publication title"), revision: source.revision, updatedAt, authorName, topicId: record.topic_id, topicUrl: identity.topic_url };
 }
 
-export async function prepare({ manifestPath, outputPath, config, fetchImpl = fetch }) {
+export async function prepare({ manifestPath, outputPath, statePath = path.join(path.dirname(outputPath), ".discussionbridge-hugo-publication-state.json"), config, fetchImpl = fetch }) {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const pages = preflight(manifest, config);
+  const operationalState = await readOperationalState(statePath);
   const output = {};
   for (const page of pages) {
     if (page.mode === "simple" && page.topic_id) output[page.key] = await retrieveSimple(page, config, fetchImpl);
-    if (page.mode === "to_discourse") output[page.key] = await resolvePage(page, config, fetchImpl);
+    if (page.mode === "to_discourse") {
+      const operation = beginAttempt(operationalState, { externalId: page.external_id, canonicalUrl: page.canonical_url });
+      await writeOperationalState(statePath, operationalState);
+      try {
+        output[page.key] = await resolvePage(page, config, fetchImpl, operation.correlationId);
+        completeAttempt(operation, output[page.key]);
+      } catch (error) {
+        failAttempt(operation, error, classifyFailure(error));
+        await writeOperationalState(statePath, operationalState);
+        throw error;
+      }
+      await writeOperationalState(statePath, operationalState);
+    }
     if (page.mode === "from_discourse") output[page.key] = await retrieveRecord(page, config, fetchImpl);
   }
   await atomicWrite(outputPath, `${JSON.stringify(output, null, 2)}\n`);
@@ -215,12 +229,12 @@ function simpleMarkup(replies, topicUrl, truncated, poweredBy, wordmark) {
 
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]); }
 
-async function resolvePage(page, config, fetchImpl) {
+async function resolvePage(page, config, fetchImpl, correlationId = randomUUID()) {
   const body = { bridge_record: {
     direction: "to_discourse", external_id: page.external_id, canonical_url: page.canonical_url,
     title: page.title, content_html: page.content_html, published: true,
     adapter_id: "hugo-discussion-bridge", adapter_version: PRODUCT_VERSION,
-    correlation_id: randomUUID(), ...(config.lane ? { lane: config.lane } : {}),
+    correlation_id: correlationId, ...(config.lane ? { lane: config.lane } : {}),
     ...(page.source_authors?.length ? { source_authors: page.source_authors, primary_source_author_id: page.primary_source_author_id } : {})
   }};
   const response = await request(config, "/discussion-bridge/v1/bridge-records/resolve.json", { method: "POST", body: JSON.stringify(body) }, fetchImpl);
@@ -228,7 +242,14 @@ async function resolvePage(page, config, fetchImpl) {
   if (!response.ok || !["created", "resolved"].includes(payload.outcome) || payload.core_fallback !== false || payload.direction !== "to_discourse") {
     throw new Error(`Hugo page ${page.key} was rejected (${response.status}).`);
   }
-  return presentationIdentity(payload, config.serverUrl, page.key);
+  return { outcome: payload.outcome, ...presentationIdentity(payload, config.serverUrl, page.key) };
+}
+
+function classifyFailure(error) {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  const reconciliationRequired = message.includes("reconciliation") || message.includes("identity collision");
+  const explicitlyRejected = message.includes("was rejected") && !/\((408|429|5\d\d)\)/u.test(message);
+  return { retryable: !explicitlyRejected && !reconciliationRequired, reconciliationRequired };
 }
 
 async function retrieveRecord(page, config, fetchImpl) {
