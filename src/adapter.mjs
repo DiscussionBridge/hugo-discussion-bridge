@@ -83,7 +83,11 @@ function nativePublication(record, siteOrigin, serverUrl) {
 }
 
 export async function prepare({ manifestPath, outputPath, statePath = path.join(path.dirname(outputPath), ".discussionbridge-hugo-publication-state.json"), config, fetchImpl = fetch, dependencies = {} }) {
-  return withOperationalStateLock(statePath, () => prepareUnlocked({ manifestPath, outputPath, statePath, config, fetchImpl, dependencies }));
+  return withOperationalStateLock(
+    statePath,
+    () => prepareUnlocked({ manifestPath, outputPath, statePath, config, fetchImpl, dependencies }),
+    dependencies.lockOptions,
+  );
 }
 
 async function prepareUnlocked({ manifestPath, outputPath, statePath, config, fetchImpl, dependencies }) {

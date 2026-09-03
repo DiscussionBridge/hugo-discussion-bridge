@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { prepare, preflight, syncNativePublications } from "../src/adapter.mjs";
 import { readOperationalState, summarizeOperationalState } from "../src/operational-state.mjs";
 import { PRODUCT_VERSION } from "../src/version.mjs";
@@ -199,6 +202,77 @@ test("overlapping prepares fail closed on the shared state file", async (t) => {
   await assert.rejects(() => readFile(`${statePath}.lock`), /ENOENT/);
 });
 
+test("a hard-killed owner is reclaimed once and retries the staged identity", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-hard-kill-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const manifestPath = path.join(dir, "manifest.json");
+  const outputPath = path.join(dir, "records.json");
+  const statePath = path.join(dir, "publication-state.json");
+  await writeFile(manifestPath, JSON.stringify({ site_origin: "https://hugo.example.com", pages: [manifest.pages[0]] }));
+  const child = spawn(process.execPath, [fileURLToPath(new URL("../test-support/hard-kill-prepare-child.mjs", import.meta.url)), manifestPath, outputPath, statePath], {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const childIdentity = await firstJsonLine(child);
+  const exited = once(child, "exit");
+  assert.equal(child.kill("SIGKILL"), true);
+  await exited;
+  assert.equal(Object.values((await readOperationalState(statePath)).operations)[0].outcome, "pending");
+  await new Promise((resolve) => setTimeout(resolve, 3_500));
+
+  const correlations = [];
+  let requests = 0;
+  const fetchImpl = async (_url, init) => {
+    requests++;
+    correlations.push(JSON.parse(init.body).bridge_record.correlation_id);
+    return new Response(JSON.stringify({ outcome: "resolved", core_fallback: false, direction: "to_discourse", resource_id: "22222222-2222-4222-8222-222222222222", topic_id: 21, topic_url: "https://bridge.example.com/t/to-bridge/21" }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  let releaseWinner;
+  const release = new Promise((resolve) => { releaseWinner = resolve; });
+  let winnerEntered;
+  const entered = new Promise((resolve) => { winnerEntered = resolve; });
+  const winner = prepare({
+    manifestPath, outputPath, statePath, config: { ...config }, fetchImpl,
+    dependencies: {
+      lockOptions: { staleMs: 2_000, updateMs: 1_000 },
+      afterResultStaged: async () => { winnerEntered(); await release; },
+    },
+  });
+  await entered;
+  await assert.rejects(
+    () => prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl }),
+    /publication state is already in use/,
+  );
+  releaseWinner();
+  await winner;
+  const recovered = Object.values((await readOperationalState(statePath)).operations)[0];
+  assert.equal(requests, 1);
+  assert.equal(correlations[0], childIdentity.correlationId);
+  assert.equal(recovered.externalId, childIdentity.externalId);
+  assert.equal(recovered.outcome, "resolved");
+  assert.equal(recovered.attempts, 2);
+  assert.match(await readFile(outputPath, "utf8"), /22222222-2222-4222-8222-222222222222/);
+});
+
+async function firstJsonLine(child) {
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      buffer += chunk;
+      const newline = buffer.indexOf("\n");
+      if (newline >= 0) {
+        try { resolve(JSON.parse(buffer.slice(0, newline))); }
+        catch (error) { reject(error); }
+      }
+    });
+    child.once("exit", (code) => reject(new Error(`Lock child exited ${code}: ${stderr}`)));
+    child.once("error", reject);
+  });
+}
+
 test("invalid later page prevents every request and output write", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-"));
   const manifestPath = path.join(dir, "manifest.json"); const outputPath = path.join(dir, "records.json");
@@ -244,7 +318,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.16"/);
+  assert.match(output, /discussionbridge_adapter_version = "0\.1\.0-alpha\.17"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });

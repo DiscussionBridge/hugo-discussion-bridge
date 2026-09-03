@@ -33,7 +33,10 @@ The state file is an atomic, secret-free operational ledger. It preserves the
 stable external identity and correlation across an interrupted request and
 records attempt count, outcome, retry/reconciliation status, and resolved
 resource/topic identity. A later exact build can retry without losing what the
-previous build attempted. Inspect its bounded operator summary with:
+previous build attempted. A renewable filesystem lease excludes overlapping
+live builds. If its owner is terminated, a later build reclaims the abandoned
+lease after the bounded stale interval and retries the same recorded identity
+and correlation. Inspect its bounded operator summary with:
 
 ```text
 discussionbridge-hugo publication-status \

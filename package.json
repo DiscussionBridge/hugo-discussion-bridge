@@ -1,16 +1,26 @@
 {
   "name": "hugo-discussion-bridge",
-  "version": "0.1.0-alpha.16",
+  "version": "0.1.0-alpha.17",
   "description": "Build-time DiscussionBridge adapter for Hugo",
   "type": "module",
-  "bin": { "discussionbridge-hugo": "./src/cli.mjs" },
+  "bin": {
+    "discussionbridge-hugo": "./src/cli.mjs"
+  },
   "scripts": {
     "build": "esbuild src/browser-simple.mjs --bundle --format=iife --minify --outfile=dist/discussionbridge-simple.js",
     "test": "node --test",
     "check": "node --check src/adapter.mjs && node --check src/cli.mjs && node --check src/browser-simple.mjs && node --check src/operational-state.mjs",
     "prepack": "npm run build"
   },
-  "engines": { "node": ">=22" },
-  "dependencies": { "dompurify": "3.4.14", "sanitize-html": "2.17.7" },
-  "devDependencies": { "esbuild": "0.25.9" }
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "dompurify": "3.4.14",
+    "proper-lockfile": "^4.1.2",
+    "sanitize-html": "2.17.7"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.9"
+  }
 }

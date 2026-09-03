@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
+import { lock } from "proper-lockfile";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OUTCOMES = new Set(["pending", "created", "resolved", "retryable_failure", "rejected", "reconciliation_required"]);
@@ -27,21 +28,24 @@ export async function writeOperationalState(file, state) {
   }
 }
 
-export async function withOperationalStateLock(file, action) {
+export async function withOperationalStateLock(file, action, options = {}) {
   await mkdir(path.dirname(file), { recursive: true });
-  const lockFile = `${file}.lock`;
-  let handle;
+  let release;
   try {
-    handle = await open(lockFile, "wx", 0o600);
+    release = await lock(file, {
+      realpath: false,
+      retries: 0,
+      stale: options.staleMs ?? 30_000,
+      update: options.updateMs ?? 10_000,
+    });
   } catch (error) {
-    if (error.code === "EEXIST") throw new Error(`Hugo publication state is already in use: ${file}`);
+    if (error.code === "ELOCKED") throw new Error(`Hugo publication state is already in use: ${file}`);
     throw error;
   }
   try {
     return await action();
   } finally {
-    await handle.close();
-    await rm(lockFile, { force: true });
+    await release();
   }
 }
 
