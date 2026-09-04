@@ -1,0 +1,12 @@
+{
+  "family": {
+    "name": "DiscussionBridge",
+    "version": "0.2.0-alpha.18"
+  },
+  "component": {
+    "name": "DiscussionBridge for Hugo",
+    "version": "0.1.0-alpha.17"
+  },
+  "bridgeCompatibility": "0.2",
+  "repository": "https://github.com/DiscussionBridge/hugo-discussion-bridge"
+}
