@@ -21,6 +21,11 @@ the exact Hugo site origin through its CORS setting.
 The connection secret is read from a protected file. It is never written to
 the Hugo data directory, generated HTML, browser JavaScript, logs or errors.
 
+Presentation manifests use the public modes `simple`, `full`, and
+`interactive`. The historical `fullInteractive` token remains accepted as a
+compatibility alias and is normalized to `interactive`; new adapter output and
+examples use only the public name. Unknown modes fail closed.
+
 ```text
 discussionbridge-hugo prepare \
   --manifest public/discussionbridge-manifest.json \

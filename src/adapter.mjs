@@ -8,7 +8,7 @@ import { beginAttempt, completeAttempt, failAttempt, readOperationalState, stage
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CONNECTION = /^dbc_[a-f0-9]{24}$/;
 const KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const MODES = new Set(["simple", "full", "to_discourse", "from_discourse"]);
+const MODES = new Set(["simple", "full", "interactive", "to_discourse", "from_discourse"]);
 const enc = new TextEncoder();
 const BRANDING_CACHE_MS = 10 * 60 * 1000;
 const brandingCache = new Map();
@@ -143,7 +143,8 @@ export function preflight(manifest, config) {
     const key = bounded(raw.key, 100, "page key");
     if (!KEY.test(key) || keys.has(key)) throw new Error(`Duplicate or invalid page key: ${key}.`);
     keys.add(key);
-    if (!MODES.has(raw.mode)) throw new Error(`Page ${key} has an unsupported mode.`);
+    const mode = raw.mode === "fullInteractive" ? "interactive" : raw.mode;
+    if (!MODES.has(mode)) throw new Error(`Page ${key} has an unsupported mode.`);
     const canonical = new URL(bounded(raw.canonical_url, 2048, `${key} canonical URL`));
     if (canonical.protocol !== "https:" || canonical.origin !== origin.origin || canonical.search || canonical.hash) {
       throw new Error(`Page ${key} canonical URL is outside the Hugo site origin.`);
@@ -151,18 +152,18 @@ export function preflight(manifest, config) {
     if (urls.has(canonical.href)) throw new Error(`Duplicate canonical URL: ${canonical.href}.`);
     urls.add(canonical.href);
     const title = bounded(raw.title, 1024, `${key} title`);
-    const page = { key, mode: raw.mode, canonical_url: canonical.href, title };
-    if (raw.mode === "simple" && raw.topic_id !== undefined) {
+    const page = { key, mode, canonical_url: canonical.href, title };
+    if (mode === "simple" && raw.topic_id !== undefined) {
       if (!Number.isSafeInteger(raw.topic_id) || raw.topic_id <= 0) throw new Error(`Page ${key} has an invalid topic ID.`);
       page.topic_id = raw.topic_id;
     }
-    if (raw.mode === "to_discourse") {
+    if (mode === "to_discourse") {
       page.content_html = cleanSourceHtml(boundedText(raw.content_html, 49_152, `${key} content HTML`));
       page.external_id = `hugo-page:${createHash("sha256").update(canonical.href).digest("hex")}`;
       page.source_authors = validateAuthors(raw.source_authors);
       page.primary_source_author_id = raw.primary_source_author_id;
     }
-    if (raw.mode === "from_discourse") page.resource_id = resourceId(raw.resource_id);
+    if (mode === "from_discourse") page.resource_id = resourceId(raw.resource_id);
     return page;
   });
   return pages.sort((a, b) => a.key.localeCompare(b.key, "en"));

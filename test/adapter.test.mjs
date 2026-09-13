@@ -35,6 +35,17 @@ test("whole-corpus preflight is deterministic and rejects collisions", () => {
   assert.throws(() => preflight(manifest, { ...config, lane: "Bad Lane" }), /lane/);
 });
 
+test("manifest mode uses Interactive publicly while accepting the historical token", () => {
+  const modes = preflight({ site_origin: "https://hugo.example.com", pages: [
+    { key: "interactive", mode: "interactive", canonical_url: "https://hugo.example.com/interactive/", title: "Interactive" },
+    { key: "legacy", mode: "fullInteractive", canonical_url: "https://hugo.example.com/legacy/", title: "Legacy" },
+  ] }, { ...config });
+  assert.deepEqual(modes.map((page) => page.mode), ["interactive", "interactive"]);
+  assert.throws(() => preflight({ site_origin: "https://hugo.example.com", pages: [
+    { key: "unknown", mode: "bridge", canonical_url: "https://hugo.example.com/unknown/", title: "Unknown" },
+  ] }, { ...config }), /unsupported mode/);
+});
+
 test("prepare resolves and retrieves then writes only nonsecret presentation state", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-"));
   const manifestPath = path.join(dir, "manifest.json"); const outputPath = path.join(dir, "records.json");
