@@ -64,7 +64,9 @@ discussionbridge-hugo sync-publications \
 
 The command validates the source topic/revision/author, exact Hugo destination,
 stable resource identity, and native-materialization authority before writing
-`content/discussionbridge/<slug>.md` atomically. The generated content record
+the canonical route atomically. A root publication writes
+`content/<slug>.md`; an explicitly configured source path writes
+`content/<source-path>/<slug>.md`. The generated content record
 uses the ordinary authenticated From Discourse build path for its bounded,
 sanitized body and discussion. Exact retries are unchanged, identity collisions
 fail closed, and no secret enters Hugo content or public output.

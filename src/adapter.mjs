@@ -40,7 +40,7 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
       try {
         const item = nativePublication(record, site.origin, config.serverUrl);
         if (!item) { summary.skipped++; continue; }
-        const file = path.join(contentDir, "discussionbridge", `${item.slug}.md`);
+        const file = path.join(contentDir, `${item.route}.md`);
         const publicationSummary = `Published from The Bridge by ${item.authorName}.`;
         const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(publicationSummary)}\nsummary = ${JSON.stringify(publicationSummary)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_author = ${JSON.stringify(item.authorName)}\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_adapter_version = "${PRODUCT_VERSION}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n`;
         let prior = null;
@@ -68,8 +68,8 @@ function nativePublication(record, siteOrigin, serverUrl) {
   const id = resourceId(record.resource_id);
   const destination = new URL(bounded(bindings[0].canonical_url, 2048, "Hugo publication destination"));
   if (destination.origin !== siteOrigin || destination.search || destination.hash) throw new Error("Hugo publication destination is invalid.");
-  const match = /^\/discussionbridge\/([a-z0-9]+(?:-[a-z0-9]+)*)\/$/u.exec(destination.pathname);
-  if (!match) throw new Error("Hugo publication path is invalid.");
+  const route = destination.pathname.endsWith("/") ? destination.pathname.slice(1, -1) : "";
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/u.test(route)) throw new Error("Hugo publication path is invalid.");
   const source = record.source;
   const base = serviceBase(serverUrl);
   if (!source || typeof source !== "object" || source.platform !== "discourse" || source.origin !== base.origin || source.topic_id !== record.topic_id || source.post_number !== 1 || !Number.isSafeInteger(source.post_id) || source.post_id < 1 || !Number.isSafeInteger(source.post_version) || source.post_version < 1 || source.revision !== `post:${source.post_id}:version:${source.post_version}`) throw new Error("Hugo publication source is invalid.");
@@ -79,7 +79,7 @@ function nativePublication(record, siteOrigin, serverUrl) {
   const authorName = bounded(source.author?.name, 200, "Hugo publication author");
   const profile = new URL(bounded(source.author?.profile_url, 2048, "Hugo publication author URL"));
   if (profile.origin !== base.origin || profile.search || profile.hash) throw new Error("Hugo publication author URL is invalid.");
-  return { resourceId: id, slug: match[1], title: bounded(record.title, 1024, "Hugo publication title"), revision: source.revision, updatedAt, authorName, topicId: record.topic_id, topicUrl: identity.topic_url };
+  return { resourceId: id, route, title: bounded(record.title, 1024, "Hugo publication title"), revision: source.revision, updatedAt, authorName, topicId: record.topic_id, topicUrl: identity.topic_url };
 }
 
 export async function prepare({ manifestPath, outputPath, statePath = path.join(path.dirname(outputPath), ".discussionbridge-hugo-publication-state.json"), config, fetchImpl = fetch, dependencies = {} }) {

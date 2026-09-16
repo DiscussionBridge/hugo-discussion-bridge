@@ -315,14 +315,14 @@ test("native publication creates once, retries unchanged, and skips presentation
       updated_at: "2026-09-01T06:57:52.495021Z",
       author: { name: "DiscussionBridge", profile_url: "https://bridge.example.com/u/discussionbridge" },
     },
-    bindings: [{ role: "presentation", state: "active", canonical_url: "https://hugo.example.com/discussionbridge/the-bridge-publishes-everywhere/", native_materialization: true }],
+    bindings: [{ role: "presentation", state: "active", canonical_url: "https://hugo.example.com/the-bridge-publishes-everywhere/", native_materialization: true }],
   };
   const presentationOnly = { ...source, resource_id: "44444444-4444-4444-8444-444444444444", bindings: [{ ...source.bindings[0], native_materialization: false }] };
   const fetchImpl = async () => new Response(JSON.stringify({ bridge_records: [presentationOnly, source], pagination: { page: 1, pages: 1, total: 2, snapshot: "snapshot-one" } }), { status: 200, headers: { "content-type": "application/json" } });
   const options = { contentDir: dir, siteUrl: "https://hugo.example.com/", config: { ...config }, fetchImpl };
   assert.deepEqual(await syncNativePublications(options), { created: 1, updated: 0, unchanged: 0, skipped: 1, failed: 0 });
   assert.deepEqual(await syncNativePublications(options), { created: 0, updated: 0, unchanged: 1, skipped: 1, failed: 0 });
-  const output = await readFile(path.join(dir, "discussionbridge", "the-bridge-publishes-everywhere.md"), "utf8");
+  const output = await readFile(path.join(dir, "the-bridge-publishes-everywhere.md"), "utf8");
   assert.match(output, /discussionbridge_native_publication = true/);
   assert.match(output, /discussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"/);
   assert.match(output, /discussionbridge_source_revision = "post:149:version:1"/);
@@ -334,12 +334,25 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });
 
+test("native publication honors an authorized source path", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-native-"));
+  const source = {
+    resource_id: "55555555-5555-4555-8555-555555555555", direction: "from_discourse", state: "healthy", title: "Nested publisher", topic_id: 54, topic_url: "https://bridge.example.com/t/nested-publisher/54",
+    source: { platform: "discourse", origin: "https://bridge.example.com", topic_id: 54, post_id: 150, post_number: 1, post_version: 1, revision: "post:150:version:1", updated_at: "2026-09-01T07:00:00.000Z", author: { name: "DiscussionBridge", profile_url: "https://bridge.example.com/u/discussionbridge" } },
+    bindings: [{ role: "presentation", state: "active", canonical_url: "https://hugo.example.com/from-the-bridge/nested-publisher/", native_materialization: true }],
+  };
+  const fetchImpl = async () => new Response(JSON.stringify({ bridge_records: [source], pagination: { page: 1, pages: 1, total: 1, snapshot: "snapshot-nested" } }), { status: 200, headers: { "content-type": "application/json" } });
+
+  assert.deepEqual(await syncNativePublications({ contentDir: dir, siteUrl: "https://hugo.example.com/", config: { ...config }, fetchImpl }), { created: 1, updated: 0, unchanged: 0, skipped: 0, failed: 0 });
+  assert.match(await readFile(path.join(dir, "from-the-bridge", "nested-publisher.md"), "utf8"), /discussionbridge_native_publication = true/);
+});
+
 test("native publication rejects snapshot drift and duplicate feed identities", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-feed-"));
   const source = {
     resource_id: "33333333-3333-4333-8333-333333333333", direction: "from_discourse", state: "healthy", title: "Publisher", topic_id: 53, topic_url: "https://bridge.example.com/t/publisher/53",
     source: { platform: "discourse", origin: "https://bridge.example.com", topic_id: 53, post_id: 149, post_number: 1, post_version: 1, revision: "post:149:version:1", updated_at: "2026-09-01T06:57:52.495021Z", author: { name: "DiscussionBridge", profile_url: "https://bridge.example.com/u/discussionbridge" } },
-    bindings: [{ role: "presentation", state: "active", canonical_url: "https://hugo.example.com/discussionbridge/publisher/", native_materialization: true }],
+    bindings: [{ role: "presentation", state: "active", canonical_url: "https://hugo.example.com/publisher/", native_materialization: true }],
   };
   let page = 0;
   const drifting = async () => {
