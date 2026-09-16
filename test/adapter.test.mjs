@@ -297,6 +297,7 @@ test("invalid later page prevents every request and output write", async () => {
 
 test("native publication creates once, retries unchanged, and skips presentation-only records", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-native-"));
+  await writeFile(path.join(dir, "ordinary.md"), '+++\ntitle = "Ordinary page"\n+++\n\ndiscussionbridge_native_publication = true\ndiscussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"\n');
   const source = {
     resource_id: "33333333-3333-4333-8333-333333333333",
     direction: "from_discourse",
@@ -332,6 +333,15 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge_adapter_version = "0\.2\.0-alpha\.20"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
+
+  const moved = { ...source, bindings: [{ ...source.bindings[0], canonical_url: "https://hugo.example.com/new-location/" }] };
+  const movedFeed = async () => new Response(JSON.stringify({ bridge_records: [moved], pagination: { page: 1, pages: 1, total: 1, snapshot: "snapshot-moved" } }), { status: 200, headers: { "content-type": "application/json" } });
+  await assert.rejects(() => syncNativePublications({ ...options, fetchImpl: movedFeed }), /explicit migration and redirect/);
+  await assert.rejects(() => readFile(path.join(dir, "new-location.md")), /ENOENT/);
+  assert.equal(await readFile(path.join(dir, "the-bridge-publishes-everywhere.md"), "utf8"), output);
+
+  await writeFile(path.join(dir, "duplicate.md"), output);
+  await assert.rejects(() => syncNativePublications(options), /resource identity is duplicated across files/);
 });
 
 test("native publication honors an authorized source path", async () => {

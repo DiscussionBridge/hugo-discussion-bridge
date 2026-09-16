@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import sanitizeHtml from "sanitize-html";
 import { PRODUCT_VERSION } from "./version.mjs";
@@ -12,11 +12,13 @@ const MODES = new Set(["simple", "full", "interactive", "to_discourse", "from_di
 const enc = new TextEncoder();
 const BRANDING_CACHE_MS = 10 * 60 * 1000;
 const brandingCache = new Map();
+class PublicationMigrationRequired extends Error {}
 
 export async function syncNativePublications({ contentDir, siteUrl, config, fetchImpl = fetch }) {
   validateConfig(config);
   const site = new URL(siteUrl);
   if (site.protocol !== "https:" || site.username || site.password || site.pathname !== "/" || site.search || site.hash) throw new Error("Hugo site URL must be an HTTPS origin.");
+  let existingPublications;
   const summary = { created: 0, updated: 0, unchanged: 0, skipped: 0, failed: 0 };
   let page = 1;
   let snapshot; let expectedPages; let expectedTotal;
@@ -33,6 +35,9 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
     } else if (payload.pagination.snapshot !== snapshot || payload.pagination.pages !== expectedPages || payload.pagination.total !== expectedTotal) {
       throw new Error("DiscussionBridge publication feed changed during synchronization.");
     }
+    if (!existingPublications && payload.bridge_records.some((record) => Array.isArray(record?.bindings) && record.bindings.some((binding) => binding?.native_materialization === true))) {
+      existingPublications = await indexNativePublications(contentDir);
+    }
     for (const record of payload.bridge_records) {
       const feedResourceId = resourceId(record?.resource_id);
       if (seenResources.has(feedResourceId)) throw new Error("DiscussionBridge publication feed contains a duplicate resource identity.");
@@ -40,7 +45,10 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
       try {
         const item = nativePublication(record, site.origin, config.serverUrl);
         if (!item) { summary.skipped++; continue; }
+        existingPublications ??= await indexNativePublications(contentDir);
         const file = path.join(contentDir, `${item.route}.md`);
+        const previousFile = existingPublications.get(item.resourceId);
+        if (previousFile && previousFile !== path.resolve(file)) throw new PublicationMigrationRequired("Hugo publication URL change requires an explicit migration and redirect.");
         const publicationSummary = `Published from The Bridge by ${item.authorName}.`;
         const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(publicationSummary)}\nsummary = ${JSON.stringify(publicationSummary)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_author = ${JSON.stringify(item.authorName)}\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_adapter_version = "${PRODUCT_VERSION}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n`;
         let prior = null;
@@ -49,14 +57,57 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
         if (prior && !prior.includes(`discussionbridge_resource_id = "${item.resourceId}"`)) throw new Error("Hugo publication identity collision.");
         await mkdir(path.dirname(file), { recursive: true });
         await atomicWrite(file, output);
+        existingPublications.set(item.resourceId, path.resolve(file));
         summary[prior ? "updated" : "created"]++;
-      } catch { summary.failed++; }
+      } catch (error) {
+        if (error instanceof PublicationMigrationRequired) throw error;
+        summary.failed++;
+      }
     }
     if (page >= payload.pagination.pages) break;
     page++;
   }
   if (seenResources.size !== expectedTotal) throw new Error("DiscussionBridge publication feed did not produce its complete unique census.");
   return summary;
+}
+
+async function indexNativePublications(contentDir) {
+  const root = path.resolve(contentDir);
+  const files = new Map();
+  const pending = [root];
+  let inspected = 0;
+  while (pending.length) {
+    const directory = pending.pop();
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); }
+    catch (error) { if (error.code === "ENOENT" && directory === root) return files; throw error; }
+    for (const entry of entries) {
+      const file = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) throw new Error("Hugo publication content contains a symlink; identity cannot be checked safely.");
+      if (entry.isDirectory()) { pending.push(file); continue; }
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      if (++inspected > 100_000) throw new Error("Hugo publication content exceeds the bounded identity census.");
+      const handle = await open(file, "r");
+      const header = Buffer.alloc(2048);
+      let bytesRead;
+      try { ({ bytesRead } = await handle.read(header, 0, header.length, 0)); }
+      finally { await handle.close(); }
+      const text = header.toString("utf8", 0, bytesRead);
+      const opening = text.match(/^\+\+\+\r?\n/u);
+      if (!opening) continue;
+      const remainder = text.slice(opening[0].length);
+      const closing = remainder.search(/\r?\n\+\+\+\r?\n/u);
+      if (closing < 0) continue;
+      const frontmatter = remainder.slice(0, closing);
+      if (!/^discussionbridge_native_publication = true\r?$/mu.test(frontmatter)) continue;
+      const match = frontmatter.match(/^discussionbridge_resource_id = "([0-9a-f-]{36})"\r?$/imu);
+      if (!match || !UUID.test(match[1])) throw new Error("Hugo native publication identity is missing or invalid.");
+      const id = match[1].toLowerCase();
+      if (files.has(id)) throw new Error("Hugo native publication resource identity is duplicated across files.");
+      files.set(id, path.resolve(file));
+    }
+  }
+  return files;
 }
 
 function nativePublication(record, siteOrigin, serverUrl) {

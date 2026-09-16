@@ -86,3 +86,8 @@ the canonical route atomically. A root publication writes
 uses the ordinary authenticated From Discourse build path for its bounded,
 sanitized body and discussion. Exact retries are unchanged, identity collisions
 fail closed, and no secret enters Hugo content or public output.
+Before writing, the command checks existing native-publication files for the
+same resource ID. If its authorized URL now points to another file, it stops
+without creating a second page. Changing an existing publication URL requires
+an explicit migration and an old-URL redirect; this command does not create
+that redirect automatically.
