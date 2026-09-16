@@ -10,6 +10,22 @@ corpus before any request, resolves authorized Hugo pages through The Bridge,
 retrieves explicitly configured From Discourse records, and atomically writes
 nonsecret presentation data for Hugo's final static build.
 
+Configure the manifest output as its own Hugo render segment so the preparation
+pass renders only that JSON output instead of rebuilding the complete site:
+
+```yaml
+segments:
+  discussionbridge-manifest:
+    includes:
+      - kind: home
+        output: discussionbridge
+```
+
+Generate the manifest with `hugo --renderSegments
+discussionbridge-manifest` before `prepare`, followed by one ordinary final
+Hugo render. This keeps the complete-page render count at one even on large
+sites.
+
 Simple comments keep that generated, sanitized reply snapshot as an immediate
 no-JavaScript and failure fallback. The packaged browser asset then refreshes
 the public reply list on each page load using credential-free Discourse JSON,
