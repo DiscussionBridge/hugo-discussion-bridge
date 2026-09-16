@@ -91,3 +91,28 @@ same resource ID. If its authorized URL now points to another file, it stops
 without creating a second page. Changing an existing publication URL requires
 an explicit migration and an old-URL redirect; this command does not create
 that redirect automatically.
+
+For Cloudflare Workers Static Assets, prepare an operator-assisted local
+cutover with the exact resource identity and both canonical URLs:
+
+```text
+discussionbridge-hugo migrate-publication \
+  --content-dir content \
+  --site-url https://hugo.example.com/ \
+  --resource-id 33333333-3333-4333-8333-333333333333 \
+  --old-url https://hugo.example.com/old-route/ \
+  --new-url https://hugo.example.com/new-route/ \
+  --redirects-file static/_redirects
+```
+
+This moves only the matching native file, rejects route/redirect collisions,
+and writes a permanent `301` rule. It does not change The Bridge binding,
+build or deploy the site, or verify the live redirect. Pause publication
+synchronization for the cutover; while the old Bridge URL remains active, a
+subsequent sync rejects the moved source instead of recreating the old page.
+Build and deploy, verify the old URL redirects to the new page and the new
+page retains its resource/topic identity, then correct the presentation
+binding in The Bridge and resume sync. If verification fails, restore the
+source and redirect manifest before changing the binding. Other Hugo hosting
+targets require their own equivalent redirect mechanism; this command does
+not prove one.

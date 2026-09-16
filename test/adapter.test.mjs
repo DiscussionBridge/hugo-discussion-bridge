@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { prepare, preflight, syncNativePublications } from "../src/adapter.mjs";
+import { migrateNativePublication, prepare, preflight, syncNativePublications } from "../src/adapter.mjs";
 import { readOperationalState, summarizeOperationalState } from "../src/operational-state.mjs";
 import { PRODUCT_VERSION } from "../src/version.mjs";
 
@@ -342,6 +342,37 @@ test("native publication creates once, retries unchanged, and skips presentation
 
   await writeFile(path.join(dir, "duplicate.md"), output);
   await assert.rejects(() => syncNativePublications(options), /resource identity is duplicated across files/);
+});
+
+test("explicit Hugo migration preserves resource identity and writes one Cloudflare redirect", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-migrate-"));
+  const oldFile = path.join(dir, "old-route.md");
+  const newFile = path.join(dir, "new-route.md");
+  const redirectsFile = path.join(dir, "_redirects");
+  const source = '+++\ntitle = "Forum source"\ndiscussionbridge_native_publication = true\ndiscussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n';
+  await writeFile(oldFile, source);
+  const migration = { contentDir: dir, siteUrl: "https://hugo.example.com/", resourceId: "33333333-3333-4333-8333-333333333333", oldUrl: "https://hugo.example.com/old-route/", newUrl: "https://hugo.example.com/new-route/", redirectsFile };
+  assert.equal((await migrateNativePublication(migration)).redirectRule, "/old-route/ /new-route/ 301");
+  await assert.rejects(() => readFile(oldFile), /ENOENT/);
+  assert.equal(await readFile(newFile, "utf8"), source);
+  assert.equal(await readFile(redirectsFile, "utf8"), "/old-route/ /new-route/ 301\n");
+  await assert.rejects(() => migrateNativePublication(migration), /old URL does not match/);
+});
+
+test("Hugo migration rejects redirect and native destination collisions before a move", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-migrate-conflict-"));
+  const oldFile = path.join(dir, "old-route.md");
+  const redirectsFile = path.join(dir, "_redirects");
+  const source = '+++\ndiscussionbridge_native_publication = true\ndiscussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"\n+++\n';
+  await writeFile(oldFile, source);
+  const migration = { contentDir: dir, siteUrl: "https://hugo.example.com/", resourceId: "33333333-3333-4333-8333-333333333333", oldUrl: "https://hugo.example.com/old-route/", newUrl: "https://hugo.example.com/new-route/", redirectsFile };
+  await writeFile(path.join(dir, "new-route.md"), "ordinary content");
+  await assert.rejects(() => migrateNativePublication(migration), /destination already has content/);
+  await rm(path.join(dir, "new-route.md"));
+  await writeFile(redirectsFile, "/old-route/ /elsewhere/ 301\n");
+  await assert.rejects(() => migrateNativePublication(migration), /redirect source conflicts/);
+  assert.equal(await readFile(oldFile, "utf8"), source);
+  assert.equal(await readFile(redirectsFile, "utf8"), "/old-route/ /elsewhere/ 301\n");
 });
 
 test("native publication honors an authorized source path", async () => {

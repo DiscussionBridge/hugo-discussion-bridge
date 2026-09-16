@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, readdir, rename, rm } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import sanitizeHtml from "sanitize-html";
 import { PRODUCT_VERSION } from "./version.mjs";
@@ -108,6 +108,52 @@ async function indexNativePublications(contentDir) {
     }
   }
   return files;
+}
+
+async function pathExists(file) {
+  try { await lstat(file); return true; }
+  catch (error) { if (error.code === "ENOENT") return false; throw error; }
+}
+
+export async function migrateNativePublication({ contentDir, siteUrl, resourceId: id, oldUrl, newUrl, redirectsFile }) {
+  const site = new URL(siteUrl);
+  if (site.protocol !== "https:" || site.username || site.password || site.pathname !== "/" || site.search || site.hash) throw new Error("Hugo site URL must be an HTTPS origin.");
+  const idValue = resourceId(id);
+  if (path.basename(redirectsFile) !== "_redirects") throw new Error("Hugo migration requires a Cloudflare _redirects file.");
+  const oldDestination = new URL(oldUrl);
+  const newDestination = new URL(newUrl);
+  const routePattern = /^\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*\/$/u;
+  for (const url of [oldDestination, newDestination]) {
+    if (url.origin !== site.origin || url.username || url.password || url.search || url.hash || !routePattern.test(url.pathname)) throw new Error("Invalid Hugo publication URL migration path.");
+  }
+  if (oldDestination.href === newDestination.href) throw new Error("Hugo publication URLs must differ.");
+  const root = path.resolve(contentDir);
+  const files = await indexNativePublications(root);
+  const sourceFile = files.get(idValue);
+  if (!sourceFile) throw new Error("Hugo publication resource does not have exactly one native source file.");
+  const sourceRoute = path.relative(root, sourceFile).split(path.sep).join("/").replace(/\.md$/u, "");
+  if (`${site.origin}/${sourceRoute}/` !== oldDestination.href) throw new Error("Hugo publication old URL does not match its native source file.");
+  const destinationRoute = newDestination.pathname.slice(1, -1);
+  const destinationFile = path.resolve(root, `${destinationRoute}.md`);
+  const alternates = [destinationFile, path.resolve(root, `${destinationRoute}.markdown`), path.resolve(root, `${destinationRoute}.html`), path.resolve(root, destinationRoute, "_index.md"), path.resolve(root, destinationRoute, "index.md")];
+  if ((await Promise.all(alternates.map(pathExists))).some(Boolean)) throw new Error("Hugo publication destination already has content.");
+  const redirectPath = path.resolve(redirectsFile);
+  let redirects = "";
+  try {
+    const status = await lstat(redirectPath);
+    if (!status.isFile() || status.isSymbolicLink() || status.size > 100_000) throw new Error("Hugo redirect manifest is not a bounded regular file.");
+    redirects = await readFile(redirectPath, "utf8");
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+  const activeRules = redirects.split(/\r?\n/u).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+  if (activeRules.length >= 2_000 || activeRules.some((line) => line.split(/\s+/u)[0] === oldDestination.pathname)) throw new Error("Hugo publication redirect source conflicts with an existing rule or exceeds Cloudflare limits.");
+  const rule = `${oldDestination.pathname} ${newDestination.pathname} 301`;
+  if (rule.length > 1_000) throw new Error("Hugo publication redirect exceeds Cloudflare limits.");
+  const nextRedirects = `${redirects.trimEnd()}${redirects.trim() ? "\n" : ""}${rule}\n`;
+  await mkdir(path.dirname(destinationFile), { recursive: true });
+  await rename(sourceFile, destinationFile);
+  try { await atomicWrite(redirectPath, nextRedirects); }
+  catch (error) { await rename(destinationFile, sourceFile); throw error; }
+  return { resourceId: idValue, oldUrl: oldDestination.href, newUrl: newDestination.href, sourceFile, destinationFile, redirectRule: rule };
 }
 
 function nativePublication(record, siteOrigin, serverUrl) {
