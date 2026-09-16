@@ -9,7 +9,8 @@
   "scripts": {
     "build": "esbuild src/browser-simple.mjs --bundle --format=iife --minify --outfile=dist/discussionbridge-simple.js",
     "test": "node --test",
-    "check": "node --check src/adapter.mjs && node --check src/cli.mjs && node --check src/browser-simple.mjs && node --check src/operational-state.mjs",
+    "check": "node --check src/adapter.mjs && node --check src/cli.mjs && node --check src/browser-simple.mjs && node --check src/operational-state.mjs && node --check scripts/verify-segmented-render.mjs",
+    "verify:large-site": "node scripts/verify-segmented-render.mjs",
     "prepack": "npm run build"
   },
   "engines": {
