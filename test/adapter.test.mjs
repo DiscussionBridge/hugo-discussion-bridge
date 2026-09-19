@@ -12,7 +12,7 @@ import { PRODUCT_VERSION } from "../src/version.mjs";
 
 const config = { serverUrl: "https://bridge.example.com", connectionId: "dbc_0123456789abcdef01234567", connectionSecret: "s".repeat(48), lane: "hugo-demo" };
 const manifest = { site_origin: "https://hugo.example.com", pages: [
-  { key: "to-bridge", mode: "to_discourse", canonical_url: "https://hugo.example.com/to/", title: "To Bridge", content_html: "<h2>Article</h2>\n<p>Useful content.</p>\n<section class=\"discussionbridge-presentation\"><p>Preparing</p></section>" },
+  { key: "to-bridge", mode: "to_discourse", canonical_url: "https://hugo.example.com/to/", external_id: `hugo-page:${"a".repeat(64)}`, title: "To Bridge", content_html: "<h2>Article</h2>\n<p>Useful content.</p>\n<section class=\"discussionbridge-presentation\"><p>Preparing</p></section>" },
   { key: "from-bridge", mode: "from_discourse", canonical_url: "https://hugo.example.com/from/", title: "From Bridge", resource_id: "11111111-1111-4111-8111-111111111111" },
   { key: "simple", mode: "simple", canonical_url: "https://hugo.example.com/simple/", title: "Simple", topic_id: 23 }
 ] };
@@ -25,8 +25,54 @@ test("package and runtime versions are identical", async () => {
   assert.equal(lock.packages[""].version, PRODUCT_VERSION);
 });
 
+test("CLI recovers one exact legacy URL-derived identity without inventing one", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-recover-id-"));
+  const statePath = path.join(dir, "state.json");
+  const externalId = `hugo-page:${"c".repeat(64)}`;
+  await writeFile(statePath, JSON.stringify({
+    schemaVersion: 1,
+    adapterId: "hugo-discussion-bridge",
+    operations: {
+      [externalId]: {
+        externalId,
+        canonicalUrl: "https://hugo.example.com/existing/",
+        correlationId: "11111111-1111-4111-8111-111111111111",
+        attempts: 1,
+        outcome: "resolved",
+        retryable: false,
+        reconciliationRequired: false,
+        resourceId: "22222222-2222-4222-8222-222222222222",
+        topicId: 21,
+        topicUrl: "https://bridge.example.com/t/existing/21",
+        lastAttemptAt: "2026-09-18T00:00:00.000Z",
+        lastSuccessAt: "2026-09-18T00:00:00.000Z",
+      },
+    },
+  }));
+  const cli = fileURLToPath(new URL("../src/cli.mjs", import.meta.url));
+  const run = (url) => new Promise((resolve) => {
+    const child = spawn(process.execPath, [cli, "recover-existing-id", "--state", statePath, "--canonical-url", url]);
+    let stdout = ""; let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.once("close", (code) => resolve({ code, stdout, stderr }));
+  });
+  assert.deepEqual(await run("https://hugo.example.com/existing/"), { code: 0, stdout: `${externalId}\n`, stderr: "" });
+  const missing = await run("https://hugo.example.com/unknown/");
+  assert.notEqual(missing.code, 0);
+  assert.match(missing.stderr, /does not contain one exact existing identity/);
+  await rm(dir, { recursive: true, force: true });
+});
+
 test("whole-corpus preflight is deterministic and rejects collisions", () => {
   assert.deepEqual(preflight(manifest, { ...config }).map((p) => p.key), ["from-bridge", "simple", "to-bridge"]);
+  const moved = structuredClone(manifest); moved.pages[0].canonical_url = "https://hugo.example.com/moved/";
+  assert.equal(preflight(moved, { ...config }).find((page) => page.key === "to-bridge").external_id, manifest.pages[0].external_id);
+  const missingId = structuredClone(manifest); delete missingId.pages[0].external_id;
+  assert.throws(() => preflight(missingId, { ...config }), /requires a persisted Hugo external ID/);
+  const duplicateId = structuredClone(manifest);
+  duplicateId.pages.push({ ...duplicateId.pages[0], key: "other-page", canonical_url: "https://hugo.example.com/other/" });
+  assert.throws(() => preflight(duplicateId, { ...config }), /Duplicate Hugo external ID/);
   const collision = structuredClone(manifest); collision.pages[1].canonical_url = collision.pages[0].canonical_url;
   assert.throws(() => preflight(collision, { ...config }), /Duplicate canonical URL/);
   assert.throws(() => preflight(manifest, { ...config, connectionSecret: "s".repeat(31) }), /connection secret/);
@@ -111,6 +157,126 @@ test("publish state survives an ambiguous failure and exact retry reuses correla
   assert.equal(operation.topicId, 21);
   assert.equal(correlations[0], correlations[1]);
   assert.doesNotMatch(JSON.stringify(recovered), new RegExp(config.connectionSecret));
+});
+
+test("a source URL move requires exact receiver attestation and preserves the existing topic", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-source-move-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const manifestPath = path.join(dir, "manifest.json");
+  const outputPath = path.join(dir, "records.json");
+  const statePath = path.join(dir, "publication-state.json");
+  const first = { site_origin: "https://hugo.example.com", pages: [manifest.pages[0]] };
+  const moved = structuredClone(first);
+  moved.pages[0].canonical_url = "https://hugo.example.com/moved/";
+  await writeFile(manifestPath, JSON.stringify(first));
+  const resourceId = "22222222-2222-4222-8222-222222222222";
+  let remoteBinding = null;
+  let postCount = 0;
+  const fetchImpl = async (url, init) => {
+    if (init.method === "GET") return new Response(JSON.stringify({ bridge_record: {
+      resource_id: resourceId, direction: "to_discourse", state: "healthy", topic_id: 21,
+      topic_url: "https://bridge.example.com/t/to-bridge/21", bindings: [remoteBinding],
+    } }), { status: 200, headers: { "content-type": "application/json" } });
+    postCount++;
+    return new Response(JSON.stringify({ outcome: postCount === 1 ? "created" : "resolved", core_fallback: false, direction: "to_discourse", resource_id: resourceId, topic_id: 21, topic_url: "https://bridge.example.com/t/to-bridge/21" }), { status: postCount === 1 ? 201 : 200, headers: { "content-type": "application/json" } });
+  };
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  await writeFile(manifestPath, JSON.stringify(moved));
+  await assert.rejects(() => prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl }), /lacks an exact verified receiver transition/);
+  assert.equal(postCount, 1);
+  const blocked = (await readOperationalState(statePath)).operations[manifest.pages[0].external_id];
+  assert.equal(blocked.canonicalUrl, first.pages[0].canonical_url);
+  assert.equal(blocked.outcome, "reconciliation_required");
+
+  remoteBinding = { role: "source", state: "active", external_id: manifest.pages[0].external_id,
+    canonical_url: moved.pages[0].canonical_url, url_migration: { old_url: first.pages[0].canonical_url,
+      new_url: moved.pages[0].canonical_url, redirect_status: 301 } };
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  assert.equal(postCount, 2);
+  const operation = (await readOperationalState(statePath)).operations[manifest.pages[0].external_id];
+  assert.equal(operation.canonicalUrl, moved.pages[0].canonical_url);
+  assert.equal(operation.resourceId, resourceId);
+  assert.equal(operation.topicId, 21);
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  assert.equal(postCount, 3);
+});
+
+test("a source URL move rejects drifted topic identity after attestation", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-topic-drift-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const manifestPath = path.join(dir, "manifest.json");
+  const outputPath = path.join(dir, "records.json");
+  const statePath = path.join(dir, "publication-state.json");
+  const first = { site_origin: "https://hugo.example.com", pages: [manifest.pages[0]] };
+  const moved = structuredClone(first);
+  moved.pages[0].canonical_url = "https://hugo.example.com/moved/";
+  await writeFile(manifestPath, JSON.stringify(first));
+  const resourceId = "22222222-2222-4222-8222-222222222222";
+  let posts = 0;
+  const fetchImpl = async (_url, init) => {
+    if (init.method === "GET") return new Response(JSON.stringify({ bridge_record: {
+      resource_id: resourceId, direction: "to_discourse", state: "healthy", topic_id: 21,
+      topic_url: "https://bridge.example.com/t/to-bridge/21", bindings: [{ role: "source", state: "active",
+        external_id: manifest.pages[0].external_id, canonical_url: moved.pages[0].canonical_url,
+        url_migration: { old_url: first.pages[0].canonical_url, new_url: moved.pages[0].canonical_url, redirect_status: 308 } }],
+    } }), { status: 200, headers: { "content-type": "application/json" } });
+    posts++;
+    return new Response(JSON.stringify({ outcome: posts === 1 ? "created" : "resolved", core_fallback: false, direction: "to_discourse",
+      resource_id: resourceId, topic_id: posts === 1 ? 21 : 99,
+      topic_url: `https://bridge.example.com/t/to-bridge/${posts === 1 ? 21 : 99}` }),
+    { status: posts === 1 ? 201 : 200, headers: { "content-type": "application/json" } });
+  };
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  await writeFile(manifestPath, JSON.stringify(moved));
+  await assert.rejects(() => prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl }), /identity changed/);
+  const operation = (await readOperationalState(statePath)).operations[manifest.pages[0].external_id];
+  assert.equal(operation.outcome, "reconciliation_required");
+  assert.equal(operation.topicId, 21);
+});
+
+test("an offline Hugo adapter verifies a contiguous two-move receiver history", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-two-moves-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const manifestPath = path.join(dir, "manifest.json");
+  const outputPath = path.join(dir, "records.json");
+  const statePath = path.join(dir, "publication-state.json");
+  const first = { site_origin: "https://hugo.example.com", pages: [manifest.pages[0]] };
+  const secondUrl = "https://hugo.example.com/second/";
+  const thirdUrl = "https://hugo.example.com/third/";
+  await writeFile(manifestPath, JSON.stringify(first));
+  const resourceId = "22222222-2222-4222-8222-222222222222";
+  let posts = 0;
+  let proofVerified = false;
+  const fetchImpl = async (url, init) => {
+    if (init.method === "GET") {
+      if (String(url).includes("source-url-proof.json")) return new Response(JSON.stringify({ source_url_proof: {
+        resource_id: resourceId, topic_id: 21, external_id: manifest.pages[0].external_id,
+        from_url: first.pages[0].canonical_url, to_url: thirdUrl,
+        verified: proofVerified, transition_count: 2,
+      } }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ bridge_record: {
+        resource_id: resourceId, direction: "to_discourse", state: "healthy", topic_id: 21,
+        topic_url: "https://bridge.example.com/t/to-bridge/21", bindings: [{ role: "source", state: "active",
+          external_id: manifest.pages[0].external_id, canonical_url: thirdUrl,
+          url_migration: { old_url: secondUrl, new_url: thirdUrl, redirect_status: 301 } }],
+      } }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    posts++;
+    return new Response(JSON.stringify({ outcome: posts === 1 ? "created" : "resolved", core_fallback: false,
+      direction: "to_discourse", resource_id: resourceId, topic_id: 21,
+      topic_url: "https://bridge.example.com/t/to-bridge/21" }),
+    { status: posts === 1 ? 201 : 200, headers: { "content-type": "application/json" } });
+  };
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  const moved = structuredClone(first);
+  moved.pages[0].canonical_url = thirdUrl;
+  await writeFile(manifestPath, JSON.stringify(moved));
+  await assert.rejects(() => prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl }), /complete receiver history/);
+  assert.equal(posts, 1);
+  proofVerified = true;
+  await prepare({ manifestPath, outputPath, statePath, config: { ...config }, fetchImpl });
+  assert.equal(posts, 2);
+  assert.equal((await readOperationalState(statePath)).operations[manifest.pages[0].external_id].canonicalUrl, thirdUrl);
 });
 
 test("a failed final output commit remains non-healthy and retries the same identity", async (t) => {
@@ -330,7 +496,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.2\.0-alpha\.21"/);
+  assert.match(output, /discussionbridge_adapter_version = "0\.2\.0-alpha\.23"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 
@@ -356,7 +522,51 @@ test("explicit Hugo migration preserves resource identity and writes one Cloudfl
   await assert.rejects(() => readFile(oldFile), /ENOENT/);
   assert.equal(await readFile(newFile, "utf8"), source);
   assert.equal(await readFile(redirectsFile, "utf8"), "/old-route/ /new-route/ 301\n");
-  await assert.rejects(() => migrateNativePublication(migration), /old URL does not match/);
+  assert.equal((await migrateNativePublication(migration)).outcome, "already_current");
+  const reverse = await migrateNativePublication({ ...migration, oldUrl: migration.newUrl, newUrl: migration.oldUrl });
+  assert.equal(reverse.redirectRule, "/new-route/ /old-route/ 301");
+  assert.equal(await readFile(oldFile, "utf8"), source);
+  await assert.rejects(() => readFile(newFile), /ENOENT/);
+  assert.equal(await readFile(redirectsFile, "utf8"), "/new-route/ /old-route/ 301\n");
+});
+
+test("Hugo publication migration recovers after hard termination at every durable boundary in both directions", async (t) => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "test";
+  t.after(() => { if (previousNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousNodeEnv; });
+  const phases = ["prepared", "redirected", "moved"];
+  for (const direction of ["forward", "reverse"]) {
+    for (const phase of phases) {
+      const dir = await mkdtemp(path.join(os.tmpdir(), `discussionbridge-hugo-migrate-hard-kill-${direction}-${phase}-`));
+      t.after(() => rm(dir, { recursive: true, force: true }));
+      const oldFile = path.join(dir, "old-route.md");
+      const redirectsFile = path.join(dir, "_redirects");
+      const source = '+++\ntitle = "Forum source"\ndiscussionbridge_native_publication = true\ndiscussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"\n+++\n';
+      await writeFile(oldFile, source);
+      const forward = { contentDir: dir, siteUrl: "https://hugo.example.com/", resourceId: "33333333-3333-4333-8333-333333333333", oldUrl: "https://hugo.example.com/old-route/", newUrl: "https://hugo.example.com/new-route/", redirectsFile };
+      if (direction === "reverse") await migrateNativePublication(forward);
+      const migration = direction === "forward" ? forward : { ...forward, oldUrl: forward.newUrl, newUrl: forward.oldUrl };
+      const inputFile = path.join(dir, "migration.json");
+      await writeFile(inputFile, JSON.stringify(migration));
+      const child = spawn(process.execPath, [fileURLToPath(new URL("../test-support/hard-kill-migration-child.mjs", import.meta.url)), inputFile], {
+        env: { ...process.env, NODE_ENV: "test", DISCUSSIONBRIDGE_TEST_MIGRATION_PAUSE: phase },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      const checkpoint = await firstJsonLine(child);
+      assert.equal(checkpoint.phase, phase);
+      const exited = once(child, "exit");
+      assert.equal(child.kill("SIGKILL"), true);
+      await exited;
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      assert.equal((await migrateNativePublication(migration)).outcome, "migrated");
+      assert.equal((await migrateNativePublication(migration)).outcome, "already_current");
+      const expectedFile = direction === "forward" ? path.join(dir, "new-route.md") : path.join(dir, "old-route.md");
+      assert.match(await readFile(expectedFile, "utf8"), /discussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"/);
+      const expectedRule = direction === "forward" ? "/old-route/ /new-route/ 301\n" : "/new-route/ /old-route/ 301\n";
+      assert.equal(await readFile(redirectsFile, "utf8"), expectedRule);
+      await assert.rejects(() => readFile(path.join(dir, ".discussionbridge-publication-url-migration.json")), /ENOENT/);
+    }
+  }
 });
 
 test("Hugo migration rejects redirect and native destination collisions before a move", async () => {
@@ -371,6 +581,9 @@ test("Hugo migration rejects redirect and native destination collisions before a
   await rm(path.join(dir, "new-route.md"));
   await writeFile(redirectsFile, "/old-route/ /elsewhere/ 301\n");
   await assert.rejects(() => migrateNativePublication(migration), /redirect source conflicts/);
+  await writeFile(redirectsFile, "/new-route/ /elsewhere/ 301\n");
+  await assert.rejects(() => migrateNativePublication(migration), /destination has a conflicting redirect/);
+  await writeFile(redirectsFile, "/old-route/ /elsewhere/ 301\n");
   assert.equal(await readFile(oldFile, "utf8"), source);
   assert.equal(await readFile(redirectsFile, "utf8"), "/old-route/ /elsewhere/ 301\n");
 });

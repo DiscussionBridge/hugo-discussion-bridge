@@ -42,6 +42,37 @@ Presentation manifests use the public modes `simple`, `full`, and
 compatibility alias and is normalized to `interactive`; new adapter output and
 examples use only the public name. Unknown modes fail closed.
 
+Each `to_discourse` page must include an immutable `external_id` in the Hugo
+manifest. Store it in that page's front matter as `discussionbridge_external_id`
+and pass it through the manifest template. Generate an ID once for a **new**
+page with `discussionbridge-hugo new-id`; do not regenerate it on builds or
+when the page URL changes. The adapter rejects missing or duplicate IDs before
+contacting Discourse. For a page published by an older adapter, first preserve
+its exact existing `external_id` from the local publication state or receiver
+binding in front matter. Do **not** assign it a new ID: that would risk a
+second record or topic. A URL move remains a separately verified operation;
+changing front matter alone does not migrate the receiver binding.
+
+Before upgrading an existing URL-derived page, recover its exact prior ID from
+the protected operational ledger and then persist the returned value in that
+page's front matter:
+
+```text
+discussionbridge-hugo recover-existing-id \
+  --state .discussionbridge/hugo-publication-state.json \
+  --canonical-url https://hugo.example.com/existing-page/
+```
+
+The command fails unless that exact prior canonical URL identifies one valid
+existing operation. It never generates or writes a replacement ID. If the
+ledger is unavailable, recover the existing ID from the receiver's
+authenticated source binding before upgrading; do not run `new-id`.
+
+```yaml
+discussionbridge_mode: to_discourse
+discussionbridge_external_id: hugo-page:<64-character-hex-value>
+```
+
 ```text
 discussionbridge-hugo prepare \
   --manifest public/discussionbridge-manifest.json \
@@ -106,7 +137,9 @@ discussionbridge-hugo migrate-publication \
 ```
 
 This moves only the matching native file, rejects route/redirect collisions,
-and writes a permanent `301` rule. It does not change The Bridge binding,
+and writes a permanent `301` rule. A direct reverse move removes the exact
+old inverse rule first; any other destination redirect is a conflict requiring
+operator reconciliation. It does not change The Bridge binding,
 build or deploy the site, or verify the live redirect. Pause publication
 synchronization for the cutover; while the old Bridge URL remains active, a
 subsequent sync rejects the moved source instead of recreating the old page.

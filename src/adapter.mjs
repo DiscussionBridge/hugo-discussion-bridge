@@ -1,6 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readFile, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
+import { lock } from "proper-lockfile";
 import sanitizeHtml from "sanitize-html";
 import { PRODUCT_VERSION } from "./version.mjs";
 import { beginAttempt, completeAttempt, failAttempt, readOperationalState, stageAttemptResult, withOperationalStateLock, writeOperationalState } from "./operational-state.mjs";
@@ -115,6 +116,68 @@ async function pathExists(file) {
   catch (error) { if (error.code === "ENOENT") return false; throw error; }
 }
 
+const MIGRATION_JOURNAL = ".discussionbridge-publication-url-migration.json";
+
+async function syncDirectory(directory) {
+  if (process.platform === "win32") return;
+  const handle = await open(directory, "r");
+  try { await handle.sync(); } finally { await handle.close(); }
+}
+
+async function durableRename(source, destination) {
+  await mkdir(path.dirname(destination), { recursive: true });
+  await rename(source, destination);
+  await syncDirectory(path.dirname(destination));
+  if (path.dirname(source) !== path.dirname(destination)) await syncDirectory(path.dirname(source));
+}
+
+async function removeDurable(file) {
+  await rm(file, { force: true });
+  await syncDirectory(path.dirname(file));
+}
+
+async function readMigrationJournal(file) {
+  try {
+    const status = await lstat(file);
+    if (!status.isFile() || status.isSymbolicLink() || status.size > 8_192) throw new Error("Hugo publication migration journal is invalid.");
+    const journal = JSON.parse(await readFile(file, "utf8"));
+    if (!journal || typeof journal !== "object" || Array.isArray(journal) || journal.version !== 1 ||
+        !["prepared", "redirected", "moved"].includes(journal.phase) || !UUID.test(journal.resourceId) ||
+        ["oldUrl", "newUrl", "sourceFile", "destinationFile", "redirectsFile", "redirectRule"].some((key) => typeof journal[key] !== "string")) {
+      throw new Error("Hugo publication migration journal is invalid.");
+    }
+    return journal;
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function migrationCheckpoint(phase, journalFile) {
+  if (process.env.NODE_ENV !== "test" || process.env.DISCUSSIONBRIDGE_TEST_MIGRATION_PAUSE !== phase) return;
+  process.stdout.write(`${JSON.stringify({ phase, journalFile })}\n`);
+  await new Promise(() => {});
+}
+
+function redirectPlan(redirects, oldPath, newPath) {
+  const lines = redirects.split(/\r?\n/u);
+  const activeRules = lines.map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+  const rule = `${oldPath} ${newPath} 301`;
+  const oldRules = activeRules.filter((line) => line.split(/\s+/u)[0] === oldPath);
+  const destinationRules = activeRules.filter((line) => line.split(/\s+/u)[0] === newPath);
+  const exactRule = oldRules.length === 1 && oldRules[0] === rule;
+  const inverseRule = destinationRules.length === 1 &&
+    [`${newPath} ${oldPath} 301`, `${newPath} ${oldPath} 308`].includes(destinationRules[0])
+    ? destinationRules[0] : null;
+  if (oldRules.length && !exactRule) throw new Error("Hugo publication redirect source conflicts with an existing rule.");
+  if (destinationRules.length && !inverseRule) throw new Error("Hugo publication destination has a conflicting redirect.");
+  if (activeRules.length - (inverseRule ? 1 : 0) - (exactRule ? 1 : 0) >= 2_000) throw new Error("Hugo publication redirect manifest exceeds Cloudflare limits.");
+  if (rule.length > 1_000) throw new Error("Hugo publication redirect exceeds Cloudflare limits.");
+  const remaining = lines.filter((line) => line.trim() !== inverseRule && line.trim() !== (exactRule ? rule : "")).join("\n");
+  const contents = `${remaining.trimEnd()}${remaining.trim() ? "\n" : ""}${rule}\n`;
+  return { rule, contents, exactRule };
+}
+
 export async function migrateNativePublication({ contentDir, siteUrl, resourceId: id, oldUrl, newUrl, redirectsFile }) {
   const site = new URL(siteUrl);
   if (site.protocol !== "https:" || site.username || site.password || site.pathname !== "/" || site.search || site.hash) throw new Error("Hugo site URL must be an HTTPS origin.");
@@ -128,32 +191,67 @@ export async function migrateNativePublication({ contentDir, siteUrl, resourceId
   }
   if (oldDestination.href === newDestination.href) throw new Error("Hugo publication URLs must differ.");
   const root = path.resolve(contentDir);
-  const files = await indexNativePublications(root);
-  const sourceFile = files.get(idValue);
-  if (!sourceFile) throw new Error("Hugo publication resource does not have exactly one native source file.");
-  const sourceRoute = path.relative(root, sourceFile).split(path.sep).join("/").replace(/\.md$/u, "");
-  if (`${site.origin}/${sourceRoute}/` !== oldDestination.href) throw new Error("Hugo publication old URL does not match its native source file.");
+  await mkdir(root, { recursive: true });
+  const testLock = process.env.NODE_ENV === "test";
+  const release = await lock(root, { realpath: true, stale: testLock ? 2_000 : 30_000, update: testLock ? 1_000 : 10_000, retries: { retries: 20, factor: 1.2, minTimeout: 50, maxTimeout: 250 } });
+  try {
   const destinationRoute = newDestination.pathname.slice(1, -1);
   const destinationFile = path.resolve(root, `${destinationRoute}.md`);
+  const sourceRoute = oldDestination.pathname.slice(1, -1);
+  const expectedSourceFile = path.resolve(root, `${sourceRoute}.md`);
   const alternates = [destinationFile, path.resolve(root, `${destinationRoute}.markdown`), path.resolve(root, `${destinationRoute}.html`), path.resolve(root, destinationRoute, "_index.md"), path.resolve(root, destinationRoute, "index.md")];
-  if ((await Promise.all(alternates.map(pathExists))).some(Boolean)) throw new Error("Hugo publication destination already has content.");
   const redirectPath = path.resolve(redirectsFile);
+  const journalFile = path.join(root, MIGRATION_JOURNAL);
+  const redirectRule = `${oldDestination.pathname} ${newDestination.pathname} 301`;
+  const expectedJournal = { version: 1, resourceId: idValue, oldUrl: oldDestination.href, newUrl: newDestination.href, sourceFile: path.relative(root, expectedSourceFile), destinationFile: path.relative(root, destinationFile), redirectsFile: redirectPath, redirectRule };
+  let journal = await readMigrationJournal(journalFile);
+  if (journal && Object.entries(expectedJournal).some(([key, value]) => journal[key] !== value)) throw new Error("A different Hugo publication URL migration requires recovery first.");
+  const files = await indexNativePublications(root);
+  const currentFile = files.get(idValue);
+  if (!currentFile) throw new Error("Hugo publication resource does not have exactly one native source file.");
+  const currentRoute = path.relative(root, currentFile).split(path.sep).join("/").replace(/\.md$/u, "");
+  const currentUrl = `${site.origin}/${currentRoute}/`;
+  if (currentUrl !== oldDestination.href && currentFile !== destinationFile) throw new Error("Hugo publication old URL does not match its native source file.");
+  if (currentFile === expectedSourceFile && (await Promise.all(alternates.map(pathExists))).some(Boolean)) throw new Error("Hugo publication destination already has content.");
   let redirects = "";
   try {
     const status = await lstat(redirectPath);
     if (!status.isFile() || status.isSymbolicLink() || status.size > 100_000) throw new Error("Hugo redirect manifest is not a bounded regular file.");
     redirects = await readFile(redirectPath, "utf8");
   } catch (error) { if (error.code !== "ENOENT") throw error; }
-  const activeRules = redirects.split(/\r?\n/u).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
-  if (activeRules.length >= 2_000 || activeRules.some((line) => line.split(/\s+/u)[0] === oldDestination.pathname)) throw new Error("Hugo publication redirect source conflicts with an existing rule or exceeds Cloudflare limits.");
-  const rule = `${oldDestination.pathname} ${newDestination.pathname} 301`;
-  if (rule.length > 1_000) throw new Error("Hugo publication redirect exceeds Cloudflare limits.");
-  const nextRedirects = `${redirects.trimEnd()}${redirects.trim() ? "\n" : ""}${rule}\n`;
-  await mkdir(path.dirname(destinationFile), { recursive: true });
-  await rename(sourceFile, destinationFile);
-  try { await atomicWrite(redirectPath, nextRedirects); }
-  catch (error) { await rename(destinationFile, sourceFile); throw error; }
-  return { resourceId: idValue, oldUrl: oldDestination.href, newUrl: newDestination.href, sourceFile, destinationFile, redirectRule: rule };
+  let plan = redirectPlan(redirects, oldDestination.pathname, newDestination.pathname);
+  if (currentFile === destinationFile && plan.exactRule && !journal) {
+    return { resourceId: idValue, oldUrl: oldDestination.href, newUrl: newDestination.href, sourceFile: expectedSourceFile, destinationFile, redirectRule: plan.rule, outcome: "already_current" };
+  }
+  if (!journal) {
+    journal = { ...expectedJournal, phase: "prepared" };
+    await atomicWrite(journalFile, `${JSON.stringify(journal, null, 2)}\n`);
+    await migrationCheckpoint("prepared", journalFile);
+  }
+  if (!plan.exactRule) {
+    await atomicWrite(redirectPath, plan.contents);
+    redirects = plan.contents;
+    plan = redirectPlan(redirects, oldDestination.pathname, newDestination.pathname);
+  }
+  if (journal.phase === "prepared") {
+    journal.phase = "redirected";
+    await atomicWrite(journalFile, `${JSON.stringify(journal, null, 2)}\n`);
+    await migrationCheckpoint("redirected", journalFile);
+  }
+  if (currentFile === expectedSourceFile) await durableRename(expectedSourceFile, destinationFile);
+  else if (currentFile !== destinationFile) throw new Error("Hugo publication migration state is inconsistent.");
+  if (journal.phase !== "moved") {
+    journal.phase = "moved";
+    await atomicWrite(journalFile, `${JSON.stringify(journal, null, 2)}\n`);
+    await migrationCheckpoint("moved", journalFile);
+  }
+  const finalFiles = await indexNativePublications(root);
+  if (finalFiles.get(idValue) !== destinationFile || !plan.exactRule) throw new Error("Hugo publication migration could not be verified.");
+  await removeDurable(journalFile);
+  return { resourceId: idValue, oldUrl: oldDestination.href, newUrl: newDestination.href, sourceFile: expectedSourceFile, destinationFile, redirectRule: plan.rule, outcome: "migrated" };
+  } finally {
+    await release();
+  }
 }
 
 function nativePublication(record, siteOrigin, serverUrl) {
@@ -196,10 +294,26 @@ async function prepareUnlocked({ manifestPath, outputPath, statePath, config, fe
   for (const page of pages) {
     if (page.mode === "simple" && page.topic_id) output[page.key] = await retrieveSimple(page, config, fetchImpl);
     if (page.mode === "to_discourse") {
+      const prior = operationalState.operations[page.external_id];
+      if (prior && prior.canonicalUrl !== page.canonical_url) {
+        try {
+          await attestSourceUrlMove(page, prior, config, fetchImpl);
+        } catch (error) {
+          const failed = beginAttempt(operationalState, { externalId: page.external_id, canonicalUrl: prior.canonicalUrl });
+          failAttempt(failed, error, classifyFailure(error));
+          await writeOperationalState(statePath, operationalState);
+          throw error;
+        }
+        prior.canonicalUrl = page.canonical_url;
+      }
       const operation = beginAttempt(operationalState, { externalId: page.external_id, canonicalUrl: page.canonical_url });
       await writeOperationalState(statePath, operationalState);
       try {
         output[page.key] = await resolvePage(page, config, fetchImpl, operation.correlationId);
+        if ((prior?.resourceId && output[page.key].resource_id !== prior.resourceId) ||
+            (prior?.topicId && output[page.key].topic_id !== prior.topicId)) {
+          throw new Error("Hugo publication identity changed during an exact retry.");
+        }
       } catch (error) {
         failAttempt(operation, error, classifyFailure(error));
         await writeOperationalState(statePath, operationalState);
@@ -224,6 +338,46 @@ async function prepareUnlocked({ manifestPath, outputPath, statePath, config, fe
   return { pages: pages.length, records: Object.keys(output).length };
 }
 
+async function attestSourceUrlMove(page, prior, config, fetchImpl) {
+  if (!prior.resourceId || !prior.topicId) {
+    throw new Error("Hugo source URL changed without a recorded receiver identity; reconcile before building.");
+  }
+  const response = await request(config, `/discussion-bridge/v1/bridge-records/${encodeURIComponent(prior.resourceId)}.json`, { method: "GET" }, fetchImpl);
+  const payload = await boundedJson(response, config.maxResponseBytes);
+  const record = payload.bridge_record;
+  if (!response.ok || !record || record.direction !== "to_discourse" || record.state !== "healthy" ||
+      record.resource_id !== prior.resourceId || record.topic_id !== prior.topicId) {
+    throw new Error("Hugo source URL move is not attested by the existing Bridge Record.");
+  }
+  presentationIdentity(record, config.serverUrl, page.key);
+  const bindings = Array.isArray(record.bindings) ? record.bindings.filter((binding) =>
+    binding && binding.role === "source" && binding.state === "active") : [];
+  if (bindings.length !== 1 || bindings[0].external_id !== page.external_id ||
+      bindings[0].canonical_url !== page.canonical_url) {
+    throw new Error("Hugo source URL move lacks an exact verified receiver transition.");
+  }
+  const latest = bindings[0].url_migration;
+  if (latest?.old_url === prior.canonicalUrl && latest?.new_url === page.canonical_url &&
+      [301, 308].includes(latest?.redirect_status)) return;
+  await attestSourceUrlChain(page, prior, config, fetchImpl);
+}
+
+async function attestSourceUrlChain(page, prior, config, fetchImpl) {
+  const query = new URLSearchParams({ from_url: prior.canonicalUrl, to_url: page.canonical_url });
+  const response = await request(config,
+    `/discussion-bridge/v1/bridge-records/${encodeURIComponent(prior.resourceId)}/source-url-proof.json?${query}`,
+    { method: "GET" }, fetchImpl);
+  const payload = await boundedJson(response, config.maxResponseBytes);
+  const proof = payload.source_url_proof;
+  if (!response.ok || !proof || proof.resource_id !== prior.resourceId || proof.topic_id !== prior.topicId ||
+      proof.external_id !== page.external_id || proof.from_url !== prior.canonicalUrl ||
+      proof.to_url !== page.canonical_url || proof.verified !== true ||
+      !Number.isSafeInteger(proof.transition_count) ||
+      proof.transition_count < 2 || proof.transition_count > 20) {
+    throw new Error("Hugo source URL move lacks a complete receiver history.");
+  }
+}
+
 export function preflight(manifest, config) {
   validateConfig(config);
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest) || !Array.isArray(manifest.pages)) {
@@ -234,7 +388,7 @@ export function preflight(manifest, config) {
   if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") {
     throw new Error("Hugo manifest site_origin must be an HTTPS origin.");
   }
-  const keys = new Set(); const urls = new Set();
+  const keys = new Set(); const urls = new Set(); const externalIds = new Set();
   const pages = manifest.pages.map((raw, index) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`Page ${index + 1} is invalid.`);
     const key = bounded(raw.key, 100, "page key");
@@ -256,7 +410,12 @@ export function preflight(manifest, config) {
     }
     if (mode === "to_discourse") {
       page.content_html = cleanSourceHtml(boundedText(raw.content_html, 49_152, `${key} content HTML`));
-      page.external_id = `hugo-page:${createHash("sha256").update(canonical.href).digest("hex")}`;
+      if (typeof raw.external_id !== "string" || !/^hugo-page:[0-9a-f]{64}$/.test(raw.external_id)) {
+        throw new Error(`Page ${key} requires a persisted Hugo external ID.`);
+      }
+      if (externalIds.has(raw.external_id)) throw new Error(`Duplicate Hugo external ID: ${raw.external_id}.`);
+      externalIds.add(raw.external_id);
+      page.external_id = raw.external_id;
       page.source_authors = validateAuthors(raw.source_authors);
       page.primary_source_author_id = raw.primary_source_author_id;
     }
@@ -377,7 +536,10 @@ async function resolvePage(page, config, fetchImpl, correlationId = randomUUID()
 
 function classifyFailure(error) {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  const reconciliationRequired = message.includes("reconciliation") || message.includes("identity collision");
+  const reconciliationRequired = message.includes("reconciliation") || message.includes("identity collision") ||
+    message.includes("identity changed") || message.includes("source url move lacks") ||
+    message.includes("source url move is not attested") ||
+    message.includes("source url changed without");
   const explicitlyRejected = message.includes("was rejected") && !/\((408|429|5\d\d)\)/u.test(message);
   return { retryable: !explicitlyRejected && !reconciliationRequired, reconciliationRequired };
 }
@@ -435,4 +597,4 @@ function boundedText(value, max, label) { if (typeof value !== "string" || !valu
 function validateAuthors(value) { if (value === undefined) return []; if (!Array.isArray(value) || value.length > 20) throw new Error("Hugo source authors are invalid."); return value.map((a) => ({ id: bounded(a?.id, 255, "author ID"), name: bounded(a?.name, 200, "author name") })); }
 function cleanSourceHtml(value) { const withoutPresentation = value.replace(/<section[^>]+class="discussionbridge-presentation"[\s\S]*?<\/section>/giu, ""); const clean = sanitizeHtml(withoutPresentation, { allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2"]), allowedAttributes: { a: ["href", "title"], img: ["src", "alt", "title", "width", "height"], code: ["class"], pre: ["class"] }, allowedSchemes: ["https"], allowProtocolRelative: false }); if (!clean.trim()) throw new Error("Hugo source content is empty after sanitization."); return clean; }
 async function boundedJson(response, maximum) { const declared = Number(response.headers.get("content-length")); if (Number.isFinite(declared) && declared > maximum) throw new Error("DiscussionBridge response is too large."); const type = response.headers.get("content-type") ?? ""; if (!/^application\/json\b/i.test(type)) throw new Error("DiscussionBridge response is not JSON."); const text = await response.text(); if (enc.encode(text).byteLength > maximum) throw new Error("DiscussionBridge response is too large."); const value = JSON.parse(text); if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("DiscussionBridge response JSON is invalid."); return value; }
-async function atomicWrite(file, contents) { const temp = path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`); let handle; try { handle = await open(temp, "wx"); await handle.writeFile(contents, "utf8"); await handle.sync(); await handle.close(); handle = undefined; await rename(temp, file); } catch (error) { await handle?.close().catch(() => {}); await rm(temp, { force: true }).catch(() => {}); throw error; } }
+async function atomicWrite(file, contents) { const temp = path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`); let handle; try { await mkdir(path.dirname(file), { recursive: true }); handle = await open(temp, "wx"); await handle.writeFile(contents, "utf8"); await handle.sync(); await handle.close(); handle = undefined; await rename(temp, file); await syncDirectory(path.dirname(file)); } catch (error) { await handle?.close().catch(() => {}); await rm(temp, { force: true }).catch(() => {}); throw error; } }
