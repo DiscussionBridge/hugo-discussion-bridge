@@ -496,7 +496,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.2\.0-alpha\.22"/);
+  assert.match(output, /discussionbridge_adapter_version = "0\.2\.0-alpha\.23"/);
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 
@@ -522,12 +522,51 @@ test("explicit Hugo migration preserves resource identity and writes one Cloudfl
   await assert.rejects(() => readFile(oldFile), /ENOENT/);
   assert.equal(await readFile(newFile, "utf8"), source);
   assert.equal(await readFile(redirectsFile, "utf8"), "/old-route/ /new-route/ 301\n");
-  await assert.rejects(() => migrateNativePublication(migration), /old URL does not match/);
+  assert.equal((await migrateNativePublication(migration)).outcome, "already_current");
   const reverse = await migrateNativePublication({ ...migration, oldUrl: migration.newUrl, newUrl: migration.oldUrl });
   assert.equal(reverse.redirectRule, "/new-route/ /old-route/ 301");
   assert.equal(await readFile(oldFile, "utf8"), source);
   await assert.rejects(() => readFile(newFile), /ENOENT/);
   assert.equal(await readFile(redirectsFile, "utf8"), "/new-route/ /old-route/ 301\n");
+});
+
+test("Hugo publication migration recovers after hard termination at every durable boundary in both directions", async (t) => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "test";
+  t.after(() => { if (previousNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousNodeEnv; });
+  const phases = ["prepared", "redirected", "moved"];
+  for (const direction of ["forward", "reverse"]) {
+    for (const phase of phases) {
+      const dir = await mkdtemp(path.join(os.tmpdir(), `discussionbridge-hugo-migrate-hard-kill-${direction}-${phase}-`));
+      t.after(() => rm(dir, { recursive: true, force: true }));
+      const oldFile = path.join(dir, "old-route.md");
+      const redirectsFile = path.join(dir, "_redirects");
+      const source = '+++\ntitle = "Forum source"\ndiscussionbridge_native_publication = true\ndiscussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"\n+++\n';
+      await writeFile(oldFile, source);
+      const forward = { contentDir: dir, siteUrl: "https://hugo.example.com/", resourceId: "33333333-3333-4333-8333-333333333333", oldUrl: "https://hugo.example.com/old-route/", newUrl: "https://hugo.example.com/new-route/", redirectsFile };
+      if (direction === "reverse") await migrateNativePublication(forward);
+      const migration = direction === "forward" ? forward : { ...forward, oldUrl: forward.newUrl, newUrl: forward.oldUrl };
+      const inputFile = path.join(dir, "migration.json");
+      await writeFile(inputFile, JSON.stringify(migration));
+      const child = spawn(process.execPath, [fileURLToPath(new URL("../test-support/hard-kill-migration-child.mjs", import.meta.url)), inputFile], {
+        env: { ...process.env, NODE_ENV: "test", DISCUSSIONBRIDGE_TEST_MIGRATION_PAUSE: phase },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      const checkpoint = await firstJsonLine(child);
+      assert.equal(checkpoint.phase, phase);
+      const exited = once(child, "exit");
+      assert.equal(child.kill("SIGKILL"), true);
+      await exited;
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      assert.equal((await migrateNativePublication(migration)).outcome, "migrated");
+      assert.equal((await migrateNativePublication(migration)).outcome, "already_current");
+      const expectedFile = direction === "forward" ? path.join(dir, "new-route.md") : path.join(dir, "old-route.md");
+      assert.match(await readFile(expectedFile, "utf8"), /discussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"/);
+      const expectedRule = direction === "forward" ? "/old-route/ /new-route/ 301\n" : "/new-route/ /old-route/ 301\n";
+      assert.equal(await readFile(redirectsFile, "utf8"), expectedRule);
+      await assert.rejects(() => readFile(path.join(dir, ".discussionbridge-publication-url-migration.json")), /ENOENT/);
+    }
+  }
 });
 
 test("Hugo migration rejects redirect and native destination collisions before a move", async () => {
