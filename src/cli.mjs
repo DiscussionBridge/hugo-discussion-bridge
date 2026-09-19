@@ -1,12 +1,33 @@
 #!/usr/bin/env node
+import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { migrateNativePublication, prepare, syncNativePublications } from "./adapter.mjs";
 import { readOperationalState, summarizeOperationalState } from "./operational-state.mjs";
 
 const args = process.argv.slice(2);
 const command = args.shift();
-if (!new Set(["prepare", "sync-publications", "publication-status", "migrate-publication"]).has(command)) throw new Error("Usage: discussionbridge-hugo prepare|sync-publications|publication-status|migrate-publication [options]");
+if (!new Set(["new-id", "recover-existing-id", "prepare", "sync-publications", "publication-status", "migrate-publication"]).has(command)) throw new Error("Usage: discussionbridge-hugo new-id|recover-existing-id|prepare|sync-publications|publication-status|migrate-publication [options]");
 const option = (name) => { const index = args.indexOf(name); if (index < 0 || !args[index + 1]) throw new Error(`Missing ${name}.`); return args[index + 1]; };
+if (command === "new-id") {
+  if (args.length) throw new Error("new-id accepts no options.");
+  process.stdout.write(`hugo-page:${randomBytes(32).toString("hex")}\n`);
+  process.exit(0);
+}
+if (command === "recover-existing-id") {
+  const state = await readOperationalState(option("--state"));
+  const rawUrl = option("--canonical-url");
+  const canonicalUrl = new URL(rawUrl);
+  if (canonicalUrl.protocol !== "https:" || canonicalUrl.username || canonicalUrl.password ||
+      canonicalUrl.search || canonicalUrl.hash || canonicalUrl.href !== rawUrl) {
+    throw new Error("--canonical-url must be the exact prior HTTPS canonical URL stored by the adapter.");
+  }
+  const matches = Object.values(state.operations).filter((operation) => operation.canonicalUrl === canonicalUrl.href);
+  if (matches.length !== 1 || !/^hugo-page:[0-9a-f]{64}$/.test(matches[0].externalId)) {
+    throw new Error("The Hugo publication state does not contain one exact existing identity for that canonical URL.");
+  }
+  process.stdout.write(`${matches[0].externalId}\n`);
+  process.exit(0);
+}
 if (command === "publication-status") {
   process.stdout.write(`${JSON.stringify(summarizeOperationalState(await readOperationalState(option("--state"))))}\n`);
   process.exit(0);
