@@ -68,6 +68,30 @@ acknowledged only after the old public URL returns 404. Exact retries preserve
 the same native identity; overlapping runs are excluded by the state lock.
 The same protected connection environment variables listed below are required.
 
+The explicit `prepare-forum-publications` command is the bounded initial
+high-water backfill. After that run completes, an unattended static deployment
+uses the durable receiver queue instead of rescanning the forum:
+
+```text
+discussionbridge-hugo prepare-publication-work \
+  --content-dir content \
+  --site-url https://obbba-hugo.demo.discussionbridge.dev/ \
+  --state .discussionbridge/forum-publications.json
+```
+
+It claims at most 20 changed or withdrawn topics with an exact one-hour static
+deployment lease, prepares their native Hugo files, and records that lease in
+protected operational state. Build and deploy normally, then run the same
+`finalize-forum-publications` command. Finalization verifies the public revision
+and includes each exact lease in its receiver acknowledgement. Prepare errors
+are reported to the central queue; an unverified or slow deployment remains
+pending for bounded finalize retries and is never falsely acknowledged.
+
+Generated frontmatter uses the Discourse topic creation time as `date` and the
+latest source edit time as `lastmod`. The first-post Discourse author remains
+visible source attribution while the Hugo build service remains the technical
+file owner.
+
 Presentation manifests use the public modes `simple`, `full`, and
 `interactive`. The historical `fullInteractive` token remains accepted as a
 compatibility alias and is normalized to `interactive`; new adapter output and

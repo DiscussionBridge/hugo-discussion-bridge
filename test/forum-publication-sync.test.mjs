@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { finalizeForumPublications, prepareForumPublications } from "../src/forum-publication-sync.mjs";
+import { finalizeForumPublications, prepareForumPublications, prepareQueuedForumPublications } from "../src/forum-publication-sync.mjs";
 
 const resourceId = "11111111-1111-4111-8111-111111111111";
 const publicationRevision = "a".repeat(64);
@@ -16,6 +16,7 @@ function sourceTopic() {
     title: "Forum Scale Publishing Canary",
     source_revision: "post:99:version:2",
     content_bytes: 30,
+    source_created_at: "2026-09-19T16:00:00.000Z",
     source_updated_at: "2026-09-20T17:00:00.000Z",
     category: { id: 6, name: "Forum Scale Canary" },
     tags: [],
@@ -65,6 +66,8 @@ test("Hugo forum publication prepares, verifies live output, acknowledges, and r
   const generated = await readFile(file, "utf8");
   assert.match(generated, new RegExp(resourceId));
   assert.match(generated, new RegExp(publicationRevision));
+  assert.match(generated, /date = "2026-09-19T16:00:00.000Z"/u);
+  assert.match(generated, /lastmod = "2026-09-20T17:00:00.000Z"/u);
   assert.doesNotMatch(generated, /dbc_123456|ssssssss/);
 
   const publicHtml = `<meta content="${resourceId}" name=discussionbridge-resource-id><meta name=discussionbridge-publication-revision content="${publicationRevision}">`;
@@ -83,6 +86,56 @@ test("Hugo forum publication prepares, verifies live output, acknowledges, and r
   assert.deepEqual(await prepareForumPublications(options), {
     created: 0, updated: 0, unchanged: 1, held: 0, unpublished: 0, failed: 0, errors: [], requires_build: false,
   });
+});
+
+test("Hugo queued publication preserves its static lease through public verification", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-queue-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const item = sourceTopic();
+  const detail = { ...item, content_html: "<p>Queued static publication.</p>" };
+  const leaseToken = "c".repeat(64);
+  let claims = 0;
+  const acknowledgements = [];
+  const bridge = {
+    platformCatalogStatus: async () => ({ destination_mapping_state: "current" }),
+    claimPublicationWork: async (seconds) => ({
+      publication_work: claims++ === 0 ? {
+        topic_id: item.topic_id, resource_id: null, action: "publish", reason: "source_changed",
+        source_revision: item.source_revision, publication_revision: item.publication_revision,
+        lease_token: leaseToken, lease_expires_at: "2099-09-20T18:00:00.000Z", attempt_count: 1,
+      } : null,
+      requested_lease_seconds: seconds,
+    }),
+    sourceTopic: async () => ({ eligible: true, source_topic: detail }),
+    resolveSourceTopic: async (_topicId, publication) => ({
+      outcome: "created", resource_id: resourceId, external_id: publication.external_id,
+      canonical_url: publication.canonical_url, pending_publication_revision: publicationRevision,
+      pending_mapping_revision: mappingRevision,
+    }),
+    failPublicationWork: async () => { throw new Error("failure reporting was not expected"); },
+    acknowledgePublication: async (id, acknowledgement) => {
+      acknowledgements.push(acknowledgement);
+      return { resource_id: id, destination_state: "healthy", acknowledged_publication_revision: publicationRevision };
+    },
+  };
+  const options = {
+    contentDir: path.join(root, "content"), siteUrl: "https://hugo.example.com/",
+    stateFile: path.join(root, "state", "forum.json"),
+    config: { serverUrl: "https://bridge.example.com", lane: "hugo-obbba" }, bridge,
+  };
+
+  assert.deepEqual(await prepareQueuedForumPublications(options), {
+    claimed: 1, created: 1, updated: 0, held: 0, unpublished: 0, failed: 0,
+    errors: [], requires_build: true, requires_finalize: true,
+  });
+  assert.equal(claims, 2);
+
+  const publicHtml = `<meta content="${resourceId}" name=discussionbridge-resource-id><meta name=discussionbridge-publication-revision content="${publicationRevision}">`;
+  assert.deepEqual(await finalizeForumPublications({
+    stateFile: options.stateFile, bridge,
+    fetchImplementation: async () => new Response(publicHtml, { status: 200, headers: { "content-type": "text/html" } }),
+  }), { acknowledged: 1, unchanged: 0, failed: 0, errors: [] });
+  assert.equal(acknowledgements[0].lease_token, leaseToken);
 });
 
 test("Hugo forum publication removes a revoked page before sending a bounded acknowledgement", async (t) => {

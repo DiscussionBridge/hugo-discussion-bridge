@@ -33,6 +33,29 @@ export class ForumBridgeClient {
     return this.request("GET", `/discussion-bridge/v1/source-revocations.json${this.cursorQuery(cursor)}`, undefined, 1024 * 1024);
   }
 
+  sourceRevocation(resourceId) {
+    if (!UUID.test(resourceId)) throw new Error("Invalid resource ID");
+    return this.request("GET", `/discussion-bridge/v1/source-revocations/${encodeURIComponent(resourceId)}.json`, undefined, 384 * 1024);
+  }
+
+  claimPublicationWork(leaseSeconds = 3600) {
+    if (!Number.isSafeInteger(leaseSeconds) || leaseSeconds < 300 || leaseSeconds > 3600) throw new Error("Invalid publication lease duration");
+    return this.request("POST", "/discussion-bridge/v1/publication-work/claim.json", { lease_seconds: leaseSeconds });
+  }
+
+  failPublicationWork(leaseToken, errorCode, errorDetail = "") {
+    if (!/^[a-f0-9]{64}$/u.test(leaseToken) || !/^[a-z0-9_-]{1,64}$/u.test(errorCode) || Buffer.byteLength(errorDetail) > 1000) {
+      throw new Error("Invalid publication failure");
+    }
+    return this.request("PUT", "/discussion-bridge/v1/publication-work/failure.json", {
+      publication_work_failure: {
+        lease_token: leaseToken,
+        error_code: errorCode,
+        error_detail: errorDetail,
+      },
+    });
+  }
+
   resolveSourceTopic(topicId, publication) {
     this.topicId(topicId);
     return this.request("POST", `/discussion-bridge/v1/source-topics/${topicId}/resolve.json`, { publication });

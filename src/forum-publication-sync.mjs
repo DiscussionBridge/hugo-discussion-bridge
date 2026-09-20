@@ -7,6 +7,7 @@ import { PRODUCT_VERSION } from "./version.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const REVISION = /^[a-f0-9]{64}$/u;
+const LEASE = /^[a-f0-9]{64}$/u;
 
 export function hugoPlatformCatalog() {
   return {
@@ -31,7 +32,7 @@ function bounded(value, maximum, label) {
 function same(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
 
 function sameSource(summary, detail) {
-  return ["topic_id", "topic_url", "title", "source_revision", "content_bytes", "source_updated_at", "category", "tags", "author", "publication", "publication_revision", "destination"]
+  return ["topic_id", "topic_url", "title", "source_revision", "content_bytes", "source_created_at", "source_updated_at", "category", "tags", "author", "publication", "publication_revision", "destination"]
     .every((key) => same(summary?.[key] ?? null, detail?.[key] ?? null));
 }
 
@@ -82,17 +83,25 @@ function publicationPlan(item, detail, siteUrl, serverUrl) {
     const route = destination.slug_policy === "topic_id" ? `forum-topic-${topicId}` : slug(title, topicId);
     canonicalUrl = new URL(`topics/${route}/`, site);
   }
+  const createdAt = bounded(item.source_created_at, 64, "source creation time");
+  const updatedAt = bounded(item.source_updated_at, 64, "source update time");
+  for (const [label, value] of [["creation", createdAt], ["update", updatedAt]]) {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u.test(value) || !Number.isFinite(Date.parse(value))) {
+      throw new Error(`Invalid source ${label} time`);
+    }
+  }
+  if (Date.parse(updatedAt) < Date.parse(createdAt)) throw new Error("Source update precedes creation");
   return {
     topicId, title, sourceRevision, publicationRevision, mappingRevision: destination.mapping_revision,
     destination, publication, topicUrl: topicUrl.href, canonicalUrl: canonicalUrl.href,
     route: canonicalUrl.pathname.slice(1, -1), externalId: `hugo:topic:${topicId}`,
     author: bounded(item.author?.name, 200, "source author"), html: sourceHtml(detail.content_html),
-    updatedAt: bounded(item.source_updated_at, 64, "source update time"),
+    createdAt, updatedAt,
   };
 }
 
 function content(plan, resourceId) {
-  return `+++\ntitle = ${JSON.stringify(plan.title)}\ndate = ${JSON.stringify(plan.updatedAt)}\nurl = ${JSON.stringify(new URL(plan.canonicalUrl).pathname)}\ndiscussionbridge_native_publication = true\ndiscussionbridge_resource_id = ${JSON.stringify(resourceId)}\ndiscussionbridge_topic_id = ${plan.topicId}\ndiscussionbridge_publication_revision = ${JSON.stringify(plan.publicationRevision)}\ndiscussionbridge_source_revision = ${JSON.stringify(plan.sourceRevision)}\ndiscussionbridge_source_author = ${JSON.stringify(plan.author)}\ndiscussionbridge_adapter_version = ${JSON.stringify(PRODUCT_VERSION)}\n+++\n\n<div class="discussionbridge-native-publication">${plan.html}</div>\n\n<hr>\n\n**Published from [The Bridge](${plan.topicUrl}) by ${plan.author}.**\n`;
+  return `+++\ntitle = ${JSON.stringify(plan.title)}\ndate = ${JSON.stringify(plan.createdAt)}\nlastmod = ${JSON.stringify(plan.updatedAt)}\nurl = ${JSON.stringify(new URL(plan.canonicalUrl).pathname)}\ndiscussionbridge_native_publication = true\ndiscussionbridge_resource_id = ${JSON.stringify(resourceId)}\ndiscussionbridge_topic_id = ${plan.topicId}\ndiscussionbridge_publication_revision = ${JSON.stringify(plan.publicationRevision)}\ndiscussionbridge_source_revision = ${JSON.stringify(plan.sourceRevision)}\ndiscussionbridge_source_author = ${JSON.stringify(plan.author)}\ndiscussionbridge_adapter_version = ${JSON.stringify(PRODUCT_VERSION)}\n+++\n\n<div class="discussionbridge-native-publication">${plan.html}</div>\n\n<hr>\n\n**Published from [The Bridge](${plan.topicUrl}) by ${plan.author}.**\n`;
 }
 
 async function atomicWrite(file, value) {
@@ -148,6 +157,55 @@ function validateResolve(response, plan) {
   return response.resource_id;
 }
 
+async function preparePublicationItem({ item, root, siteUrl, config, bridge, state, lease }) {
+  const detail = await bridge.sourceTopic(item.topic_id);
+  if (detail?.eligible !== true || !detail.source_topic) throw new Error("Source topic is no longer eligible");
+  const plan = publicationPlan(item, detail.source_topic, siteUrl, config.serverUrl);
+  const resolved = await bridge.resolveSourceTopic(plan.topicId, {
+    source_revision: plan.sourceRevision, publication_revision: plan.publicationRevision,
+    mapping_revision: plan.mappingRevision, destination: plan.destination,
+    external_id: plan.externalId, canonical_url: plan.canonicalUrl,
+    ...(config.lane ? { lane: config.lane } : {}), native_materialization: true,
+  });
+  const resourceId = validateResolve(resolved, plan);
+  const file = path.resolve(root, `${plan.route}.md`);
+  if (!file.startsWith(`${root}${path.sep}`)) throw new Error("Hugo publication path escaped content root");
+  const expected = content(plan, resourceId);
+  let prior;
+  try { prior = await readFile(file, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  const receiverCurrent = plan.publication.destination_state === "healthy" && plan.publication.acknowledged_publication_revision === plan.publicationRevision;
+  const outcome = prior === undefined ? "created" : prior === expected && receiverCurrent ? "unchanged" : "updated";
+  if (prior !== expected) await atomicWrite(file, expected);
+  state.publications[String(plan.topicId)] = {
+    topic_id: plan.topicId, resource_id: resourceId, external_id: plan.externalId,
+    canonical_url: plan.canonicalUrl, file: path.relative(root, file), source_revision: plan.sourceRevision,
+    publication_revision: plan.publicationRevision, mapping_revision: plan.mappingRevision,
+    destination: plan.destination, outcome, state: outcome === "unchanged" ? "healthy" : "pending_publish",
+    adapter_version: PRODUCT_VERSION,
+    ...(lease ? { lease_token: lease.token, lease_expires_at: lease.expiresAt } : {}),
+  };
+  return { outcome, requiresBuild: prior !== expected };
+}
+
+function validateClaim(response) {
+  const work = response?.publication_work;
+  if (work === null) return null;
+  if (!work || !Number.isSafeInteger(work.topic_id) || work.topic_id <= 0 ||
+      !["publish", "unpublish"].includes(work.action) || !LEASE.test(work.lease_token ?? "") ||
+      !REVISION.test(work.publication_revision ?? "") ||
+      typeof work.lease_expires_at !== "string" || !Number.isFinite(Date.parse(work.lease_expires_at))) {
+    throw new Error("Invalid publication work claim");
+  }
+  if (work.action === "unpublish" && !UUID.test(work.resource_id ?? "")) throw new Error("Invalid publication withdrawal claim");
+  return work;
+}
+
+function failureCode(error) {
+  const reason = typeof error?.reason === "string" ? error.reason : "hugo_prepare_failed";
+  const code = reason.toLowerCase().replace(/[^a-z0-9_-]+/gu, "_").replace(/^_+|_+$/gu, "").slice(0, 64);
+  return code || "hugo_prepare_failed";
+}
+
 export async function prepareForumPublications({ contentDir, siteUrl, stateFile, config, bridge }) {
   const current = await bridge.platformCatalogStatus();
   const catalog = await bridge.updatePlatformCatalog(hugoPlatformCatalog(), current?.catalog_revision || undefined);
@@ -178,31 +236,10 @@ export async function prepareForumPublications({ contentDir, siteUrl, stateFile,
             summary.held++;
             continue;
           }
-          const detail = await bridge.sourceTopic(item.topic_id);
-          if (detail?.eligible !== true || !detail.source_topic) throw new Error("Source topic is no longer eligible");
-          const plan = publicationPlan(item, detail.source_topic, siteUrl, config.serverUrl);
-          const resolved = await bridge.resolveSourceTopic(plan.topicId, {
-            source_revision: plan.sourceRevision, publication_revision: plan.publicationRevision,
-            mapping_revision: plan.mappingRevision, destination: plan.destination,
-            external_id: plan.externalId, canonical_url: plan.canonicalUrl,
-            ...(config.lane ? { lane: config.lane } : {}), native_materialization: true,
+          const { outcome, requiresBuild } = await preparePublicationItem({
+            item, root, siteUrl, config, bridge, state,
           });
-          const resourceId = validateResolve(resolved, plan);
-          const file = path.resolve(root, `${plan.route}.md`);
-          if (!file.startsWith(`${root}${path.sep}`)) throw new Error("Hugo publication path escaped content root");
-          const expected = content(plan, resourceId);
-          let prior;
-          try { prior = await readFile(file, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
-          const receiverCurrent = plan.publication.destination_state === "healthy" && plan.publication.acknowledged_publication_revision === plan.publicationRevision;
-          const outcome = prior === undefined ? "created" : prior === expected && receiverCurrent ? "unchanged" : "updated";
-          if (prior !== expected) { await atomicWrite(file, expected); summary.requires_build = true; }
-          state.publications[String(plan.topicId)] = {
-            topic_id: plan.topicId, resource_id: resourceId, external_id: plan.externalId,
-            canonical_url: plan.canonicalUrl, file: path.relative(root, file), source_revision: plan.sourceRevision,
-            publication_revision: plan.publicationRevision, mapping_revision: plan.mappingRevision,
-            destination: plan.destination, outcome, state: outcome === "unchanged" ? "healthy" : "pending_publish",
-            adapter_version: PRODUCT_VERSION,
-          };
+          if (requiresBuild) summary.requires_build = true;
           summary[outcome]++;
         } catch (error) { summary.failed++; summary.errors.push({ topic_id: item.topic_id, reason: String(error?.message ?? error).slice(0, 240) }); }
       }
@@ -227,6 +264,75 @@ export async function prepareForumPublications({ contentDir, siteUrl, stateFile,
       }
       cursor = nextCursor(payload);
     } while (cursor);
+    return summary;
+  });
+}
+
+export async function prepareQueuedForumPublications({ contentDir, siteUrl, stateFile, config, bridge, maximum = 20 }) {
+  if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 20) throw new Error("Invalid publication work limit");
+  const catalog = await bridge.platformCatalogStatus();
+  if (catalog?.destination_mapping_state !== "current") throw new Error("Hugo destination mapping requires operator configuration");
+  const root = path.resolve(contentDir);
+  return withState(stateFile, async (state) => {
+    const summary = { claimed: 0, created: 0, updated: 0, held: 0, unpublished: 0, failed: 0, errors: [], requires_build: false, requires_finalize: false };
+    const now = Date.now();
+    for (const publication of Object.values(state.publications)) {
+      if (!["pending_publish", "pending_hold", "pending_unpublish"].includes(publication.state) || !publication.lease_token) continue;
+      if (Number.isFinite(Date.parse(publication.lease_expires_at)) && Date.parse(publication.lease_expires_at) > now) {
+        summary.requires_finalize = true;
+        return summary;
+      }
+      publication.state = "attention";
+      delete publication.lease_token;
+      delete publication.lease_expires_at;
+    }
+
+    for (let index = 0; index < maximum; index++) {
+      const work = validateClaim(await bridge.claimPublicationWork(3600));
+      if (work === null) break;
+      summary.claimed++;
+      try {
+        if (work.action === "publish") {
+          const detail = await bridge.sourceTopic(work.topic_id);
+          const item = detail?.eligible === true && detail.source_topic ? detail.source_topic : null;
+          if (!item || item.publication_revision !== work.publication_revision || item.source_revision !== work.source_revision) {
+            throw new Error("Claimed source revision changed");
+          }
+          const { outcome, requiresBuild } = await preparePublicationItem({
+            item, root, siteUrl, config, bridge, state,
+            lease: { token: work.lease_token, expiresAt: work.lease_expires_at },
+          });
+          summary[outcome]++;
+          if (requiresBuild || outcome !== "unchanged") summary.requires_build = true;
+        } else {
+          const detail = await bridge.sourceRevocation(work.resource_id);
+          const item = detail?.revoked === true ? detail.publication_revocation : null;
+          if (!item || item.topic_id !== work.topic_id || item.publication_revision !== work.publication_revision) {
+            throw new Error("Claimed publication withdrawal changed");
+          }
+          const local = state.publications[String(work.topic_id)];
+          if (!local || local.resource_id !== work.resource_id) throw new Error("Hugo publication for withdrawal is unavailable");
+          await rm(path.resolve(root, local.file), { force: true });
+          Object.assign(local, {
+            publication_revision: work.publication_revision,
+            outcome: "unpublished",
+            state: "pending_unpublish",
+            lease_token: work.lease_token,
+            lease_expires_at: work.lease_expires_at,
+          });
+          summary.unpublished++;
+          summary.requires_build = true;
+        }
+        summary.requires_finalize = true;
+        await atomicWrite(stateFile, `${JSON.stringify(state, null, 2)}\n`);
+      } catch (error) {
+        const detail = String(error?.message ?? error).replace(/[\u0000-\u001f\u007f]/gu, " ").slice(0, 1000);
+        try { await bridge.failPublicationWork(work.lease_token, failureCode(error), detail); }
+        catch (reportError) { summary.errors.push({ topic_id: work.topic_id, reason: String(reportError?.message ?? reportError).slice(0, 240) }); }
+        summary.failed++;
+        summary.errors.push({ topic_id: work.topic_id, reason: detail.slice(0, 240) });
+      }
+    }
     return summary;
   });
 }
@@ -277,6 +383,7 @@ export async function finalizeForumPublications({ stateFile, bridge, fetchImplem
               publication_revision: publication.publication_revision,
               native_destination: { external_id: publication.external_id, canonical_url: publication.canonical_url },
               outcome: "unpublished",
+              ...(publication.lease_token ? { lease_token: publication.lease_token } : {}),
             }
           : {
               source_revision: publication.source_revision,
@@ -285,11 +392,16 @@ export async function finalizeForumPublications({ stateFile, bridge, fetchImplem
               destination: publication.destination,
               native_destination: { external_id: publication.external_id, canonical_url: publication.canonical_url },
               outcome: publication.outcome,
+              ...(publication.lease_token ? { lease_token: publication.lease_token } : {}),
             };
         const response = await bridge.acknowledgePublication(publication.resource_id, acknowledgement);
         const expectedState = removal ? "held" : "healthy";
         if (response?.resource_id !== publication.resource_id || response.destination_state !== expectedState || response.acknowledged_publication_revision !== publication.publication_revision) throw new Error("Invalid Hugo acknowledgement response");
-        publication.state = removal ? "held" : "healthy"; publication.acknowledged_at = new Date().toISOString(); summary.acknowledged++;
+        publication.state = removal ? "held" : "healthy";
+        publication.acknowledged_at = new Date().toISOString();
+        delete publication.lease_token;
+        delete publication.lease_expires_at;
+        summary.acknowledged++;
       } catch (error) { summary.failed++; summary.errors.push({ topic_id: publication.topic_id, reason: String(error?.message ?? error).slice(0, 240) }); }
     }
     return summary;
