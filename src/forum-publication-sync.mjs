@@ -242,6 +242,18 @@ async function publicHtml(url, fetchImplementation) {
   return text;
 }
 
+function hasMeta(html, expectedName, expectedContent) {
+  const tags = html.match(/<meta\b[^>]*>/giu) ?? [];
+  return tags.some((tag) => {
+    const attributes = {};
+    const pattern = /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/gu;
+    for (const match of tag.matchAll(pattern)) {
+      attributes[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? "";
+    }
+    return attributes.name === expectedName && attributes.content === expectedContent;
+  });
+}
+
 export async function finalizeForumPublications({ stateFile, bridge, fetchImplementation = fetch }) {
   return withState(stateFile, async (state) => {
     const summary = { acknowledged: 0, unchanged: 0, failed: 0, errors: [] };
@@ -255,7 +267,10 @@ export async function finalizeForumPublications({ stateFile, bridge, fetchImplem
           if (response.status !== 404) throw new Error("Hugo publication remains publicly available after removal");
         } else {
           const html = await publicHtml(publication.canonical_url, fetchImplementation);
-          if (!html.includes(`<meta name="discussionbridge-resource-id" content="${publication.resource_id}">`) || !html.includes(`<meta name="discussionbridge-publication-revision" content="${publication.publication_revision}">`)) throw new Error("Hugo public publication markers do not match pending identity");
+          if (!hasMeta(html, "discussionbridge-resource-id", publication.resource_id) ||
+              !hasMeta(html, "discussionbridge-publication-revision", publication.publication_revision)) {
+            throw new Error("Hugo public publication markers do not match pending identity");
+          }
         }
         const acknowledgement = publication.state === "pending_unpublish"
           ? {

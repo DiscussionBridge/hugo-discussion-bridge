@@ -67,7 +67,7 @@ test("Hugo forum publication prepares, verifies live output, acknowledges, and r
   assert.match(generated, new RegExp(publicationRevision));
   assert.doesNotMatch(generated, /dbc_123456|ssssssss/);
 
-  const publicHtml = `<meta name="discussionbridge-resource-id" content="${resourceId}"><meta name="discussionbridge-publication-revision" content="${publicationRevision}">`;
+  const publicHtml = `<meta content="${resourceId}" name=discussionbridge-resource-id><meta name=discussionbridge-publication-revision content="${publicationRevision}">`;
   assert.deepEqual(await finalizeForumPublications({
     stateFile: options.stateFile, bridge,
     fetchImplementation: async (url) => new Response(publicHtml, { status: 200, headers: { "content-type": "text/html", "content-length": String(publicHtml.length) } }),
