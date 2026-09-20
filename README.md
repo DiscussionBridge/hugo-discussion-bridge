@@ -37,6 +37,37 @@ the exact Hugo site origin through its CORS setting.
 The connection secret is read from a protected file. It is never written to
 the Hugo data directory, generated HTML, browser JavaScript, logs or errors.
 
+## Forum-scale publishing from Discourse
+
+The forum-wide workflow is deliberately two phase because Hugo cannot prove a
+static publication is live until its generated site has been deployed. The
+trusted build first prepares native content from the receiver's eligible topic
+feed:
+
+```text
+discussionbridge-hugo prepare-forum-publications \
+  --content-dir content \
+  --site-url https://hugo.example.com/ \
+  --state .discussionbridge/forum-publications.json
+```
+
+Preparation uploads Hugo's bounded destination catalog, fails closed until an
+operator has configured a current destination mapping, resolves stable topic
+and resource identities, and atomically writes sanitized Markdown. It does not
+acknowledge success to the receiver. Build and deploy the Hugo site normally,
+then finalize against the public URLs:
+
+```text
+discussionbridge-hugo finalize-forum-publications \
+  --state .discussionbridge/forum-publications.json
+```
+
+Finalization requires the exact public resource and publication-revision
+markers before acknowledging a healthy destination. Holds and revocations are
+acknowledged only after the old public URL returns 404. Exact retries preserve
+the same native identity; overlapping runs are excluded by the state lock.
+The same protected connection environment variables listed below are required.
+
 Presentation manifests use the public modes `simple`, `full`, and
 `interactive`. The historical `fullInteractive` token remains accepted as a
 compatibility alias and is normalized to `interactive`; new adapter output and

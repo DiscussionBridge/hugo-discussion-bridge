@@ -2,11 +2,13 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { migrateNativePublication, prepare, syncNativePublications } from "./adapter.mjs";
+import { ForumBridgeClient } from "./forum-bridge-client.mjs";
+import { finalizeForumPublications, prepareForumPublications } from "./forum-publication-sync.mjs";
 import { readOperationalState, summarizeOperationalState } from "./operational-state.mjs";
 
 const args = process.argv.slice(2);
 const command = args.shift();
-if (!new Set(["new-id", "recover-existing-id", "prepare", "sync-publications", "publication-status", "migrate-publication"]).has(command)) throw new Error("Usage: discussionbridge-hugo new-id|recover-existing-id|prepare|sync-publications|publication-status|migrate-publication [options]");
+if (!new Set(["new-id", "recover-existing-id", "prepare", "sync-publications", "publication-status", "migrate-publication", "prepare-forum-publications", "finalize-forum-publications"]).has(command)) throw new Error("Usage: discussionbridge-hugo new-id|recover-existing-id|prepare|sync-publications|publication-status|migrate-publication|prepare-forum-publications|finalize-forum-publications [options]");
 const option = (name) => { const index = args.indexOf(name); if (index < 0 || !args[index + 1]) throw new Error(`Missing ${name}.`); return args[index + 1]; };
 if (command === "new-id") {
   if (args.length) throw new Error("new-id accepts no options.");
@@ -43,12 +45,23 @@ if (command === "migrate-publication") {
 const secretFile = process.env.DISCUSSIONBRIDGE_CONNECTION_SECRET_FILE;
 if (!secretFile) throw new Error("DISCUSSIONBRIDGE_CONNECTION_SECRET_FILE is required.");
 const config = {
-  serverUrl: process.env.DISCUSSIONBRIDGE_SERVER_URL,
+  serverUrl: new URL(process.env.DISCUSSIONBRIDGE_SERVER_URL).origin,
   connectionId: process.env.DISCUSSIONBRIDGE_CONNECTION_ID,
   connectionSecret: (await readFile(secretFile, "utf8")).trim(),
   lane: process.env.DISCUSSIONBRIDGE_LANE
 };
-if (command === "prepare") {
+if (command === "prepare-forum-publications") {
+  const result = await prepareForumPublications({
+    contentDir: option("--content-dir"), siteUrl: option("--site-url"), stateFile: option("--state"),
+    config, bridge: new ForumBridgeClient(config),
+  });
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+  if (result.failed) process.exitCode = 1;
+} else if (command === "finalize-forum-publications") {
+  const result = await finalizeForumPublications({ stateFile: option("--state"), bridge: new ForumBridgeClient(config) });
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+  if (result.failed) process.exitCode = 1;
+} else if (command === "prepare") {
   const result = await prepare({ manifestPath: option("--manifest"), outputPath: option("--output"), statePath: option("--state"), config });
   process.stdout.write(`Prepared ${result.records} DiscussionBridge records from ${result.pages} Hugo pages.\n`);
 } else {
