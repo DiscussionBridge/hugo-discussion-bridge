@@ -9,18 +9,22 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const REVISION = /^[a-f0-9]{64}$/u;
 const LEASE = /^[a-f0-9]{64}$/u;
 
-export function hugoPlatformCatalog() {
+export function hugoPlatformCatalog(rawSections = []) {
+  const sections = publicationSections(rawSections);
   return {
     schema_version: 1,
     platform: "hugo",
-    containers: [{ id: "topics", label: "Topics", kind: "section", path: "/topics/", taxonomy_ids: [] }],
-    taxonomies: [],
+    containers: [{ id: "topics", label: "Topics", kind: "section", path: "/topics/", taxonomy_ids: sections.length ? ["section"] : [] }],
+    taxonomies: sections.length ? [{
+      id: "section", label: "Sections", kind: "taxonomy",
+      terms: sections.map(({ id, label, path: sectionPath }) => ({ id, label, kind: "term", path: sectionPath })),
+    }] : [],
     authors: [{ id: "hugo:service", label: "Hugo build service", kind: "author" }],
     service_author_id: "hugo:service",
     presentation_modes: ["simple", "full", "fullInteractive", "native"],
     capabilities: { updates: true, unpublish: true, drafts: true },
     limits: { content_bytes: 49_152, title_bytes: 255, slug_bytes: 191 },
-    inventory: { authors_complete: true, terms_complete: true, authors_observed: 1, terms_observed: 0 },
+    inventory: { authors_complete: true, terms_complete: true, authors_observed: 1, terms_observed: sections.length },
   };
 }
 
@@ -58,7 +62,7 @@ function safeSite(value) {
   return site;
 }
 
-function publicationPlan(item, detail, siteUrl, serverUrl) {
+function publicationPlan(item, detail, siteUrl, serverUrl, rawSections = []) {
   if (!item || !detail || !sameSource(item, detail)) throw new Error("Source topic changed during synchronization");
   const topicId = item.topic_id;
   if (!Number.isSafeInteger(topicId) || topicId <= 0) throw new Error("Invalid source topic identity");
@@ -66,9 +70,15 @@ function publicationPlan(item, detail, siteUrl, serverUrl) {
   const publicationRevision = bounded(item.publication_revision, 64, "publication revision");
   if (!REVISION.test(publicationRevision)) throw new Error("Invalid publication revision");
   const destination = item.destination;
-  if (!destination || destination.state !== "ready" || !REVISION.test(destination.mapping_revision ?? "") || destination.destination_container_id !== "topics" || destination.destination_terms?.length) {
+  if (!destination || destination.state !== "ready" || !REVISION.test(destination.mapping_revision ?? "") || destination.destination_container_id !== "topics") {
     throw new Error("Hugo destination is not ready");
   }
+  const terms = Array.isArray(destination.destination_terms) ? destination.destination_terms : [];
+  if (terms.length > 1) throw new Error("Hugo destination has multiple native sections");
+  const section = terms.length ? publicationSections(rawSections).find(({ id }) =>
+    terms[0]?.destination_taxonomy_id === "section" && terms[0]?.destination_term_id === id
+  ) : undefined;
+  if (terms.length && !section) throw new Error("Hugo destination section is invalid");
   const site = safeSite(siteUrl);
   const forum = new URL(serverUrl);
   const topicUrl = new URL(bounded(item.topic_url, 2048, "source topic URL"));
@@ -96,12 +106,13 @@ function publicationPlan(item, detail, siteUrl, serverUrl) {
     destination, publication, topicUrl: topicUrl.href, canonicalUrl: canonicalUrl.href,
     route: canonicalUrl.pathname.slice(1, -1), externalId: `hugo:topic:${topicId}`,
     author: bounded(item.author?.name, 200, "source author"), html: sourceHtml(detail.content_html),
-    createdAt, updatedAt,
+    createdAt, updatedAt, section,
   };
 }
 
 function content(plan, resourceId) {
-  return `+++\ntitle = ${JSON.stringify(plan.title)}\ndate = ${JSON.stringify(plan.createdAt)}\nlastmod = ${JSON.stringify(plan.updatedAt)}\nurl = ${JSON.stringify(new URL(plan.canonicalUrl).pathname)}\ndiscussionbridge_native_publication = true\ndiscussionbridge_resource_id = ${JSON.stringify(resourceId)}\ndiscussionbridge_topic_id = ${plan.topicId}\ndiscussionbridge_publication_revision = ${JSON.stringify(plan.publicationRevision)}\ndiscussionbridge_source_revision = ${JSON.stringify(plan.sourceRevision)}\ndiscussionbridge_source_author = ${JSON.stringify(plan.author)}\ndiscussionbridge_adapter_version = ${JSON.stringify(PRODUCT_VERSION)}\n+++\n\n<div class="discussionbridge-native-publication">${plan.html}</div>\n\n<hr>\n\n**Published from [The Bridge](${plan.topicUrl}) by ${plan.author}.**\n`;
+  const section = plan.section ? `discussionbridge_section = ${JSON.stringify(plan.section.id)}\n` : "";
+  return `+++\ntitle = ${JSON.stringify(plan.title)}\ndate = ${JSON.stringify(plan.createdAt)}\nlastmod = ${JSON.stringify(plan.updatedAt)}\nurl = ${JSON.stringify(new URL(plan.canonicalUrl).pathname)}\n${section}discussionbridge_native_publication = true\ndiscussionbridge_resource_id = ${JSON.stringify(resourceId)}\ndiscussionbridge_topic_id = ${plan.topicId}\ndiscussionbridge_publication_revision = ${JSON.stringify(plan.publicationRevision)}\ndiscussionbridge_source_revision = ${JSON.stringify(plan.sourceRevision)}\ndiscussionbridge_source_author = ${JSON.stringify(plan.author)}\ndiscussionbridge_adapter_version = ${JSON.stringify(PRODUCT_VERSION)}\n+++\n\n<div class="discussionbridge-native-publication">${plan.html}</div>\n\n<hr>\n\n**Published from [The Bridge](${plan.topicUrl}) by ${plan.author}.**\n`;
 }
 
 async function atomicWrite(file, value) {
@@ -157,10 +168,10 @@ function validateResolve(response, plan) {
   return response.resource_id;
 }
 
-async function preparePublicationItem({ item, root, siteUrl, config, bridge, state, lease }) {
+async function preparePublicationItem({ item, root, siteUrl, config, bridge, state, lease, sections }) {
   const detail = await bridge.sourceTopic(item.topic_id);
   if (detail?.eligible !== true || !detail.source_topic) throw new Error("Source topic is no longer eligible");
-  const plan = publicationPlan(item, detail.source_topic, siteUrl, config.serverUrl);
+  const plan = publicationPlan(item, detail.source_topic, siteUrl, config.serverUrl, sections);
   const resolved = await bridge.resolveSourceTopic(plan.topicId, {
     source_revision: plan.sourceRevision, publication_revision: plan.publicationRevision,
     mapping_revision: plan.mappingRevision, destination: plan.destination,
@@ -206,9 +217,22 @@ function failureCode(error) {
   return code || "hugo_prepare_failed";
 }
 
-export async function prepareForumPublications({ contentDir, siteUrl, stateFile, config, bridge }) {
+function publicationSections(raw) {
+  if (!Array.isArray(raw) || raw.length > 100) throw new Error("Invalid Hugo native section inventory");
+  const sections = raw.map((item) => {
+    const id = bounded(item?.id, 100, "section id");
+    const label = bounded(item?.label, 255, "section label");
+    const sectionPath = bounded(item?.path, 255, "section path");
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(id) || sectionPath !== `/sections/${id}/`) throw new Error("Invalid Hugo native section");
+    return { id, label, path: sectionPath };
+  });
+  if (new Set(sections.map(({ id }) => id)).size !== sections.length) throw new Error("Duplicate Hugo native section");
+  return sections;
+}
+
+export async function prepareForumPublications({ contentDir, siteUrl, stateFile, config, bridge, sections = [] }) {
   const current = await bridge.platformCatalogStatus();
-  const catalog = await bridge.updatePlatformCatalog(hugoPlatformCatalog(), current?.catalog_revision || undefined);
+  const catalog = await bridge.updatePlatformCatalog(hugoPlatformCatalog(sections), current?.catalog_revision || undefined);
   if (catalog?.destination_mapping_state !== "current") throw new Error("Hugo destination mapping requires operator configuration");
   const root = path.resolve(contentDir);
   return withState(stateFile, async (state) => {
@@ -237,7 +261,7 @@ export async function prepareForumPublications({ contentDir, siteUrl, stateFile,
             continue;
           }
           const { outcome, requiresBuild } = await preparePublicationItem({
-            item, root, siteUrl, config, bridge, state,
+            item, root, siteUrl, config, bridge, state, sections,
           });
           if (requiresBuild) summary.requires_build = true;
           summary[outcome]++;
@@ -268,7 +292,7 @@ export async function prepareForumPublications({ contentDir, siteUrl, stateFile,
   });
 }
 
-export async function prepareQueuedForumPublications({ contentDir, siteUrl, stateFile, config, bridge, maximum = 20 }) {
+export async function prepareQueuedForumPublications({ contentDir, siteUrl, stateFile, config, bridge, maximum = 20, sections = [] }) {
   if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 20) throw new Error("Invalid publication work limit");
   const catalog = await bridge.platformCatalogStatus();
   if (catalog?.destination_mapping_state !== "current") throw new Error("Hugo destination mapping requires operator configuration");
@@ -299,7 +323,7 @@ export async function prepareQueuedForumPublications({ contentDir, siteUrl, stat
             throw new Error("Claimed source revision changed");
           }
           const { outcome, requiresBuild } = await preparePublicationItem({
-            item, root, siteUrl, config, bridge, state,
+            item, root, siteUrl, config, bridge, state, sections,
             lease: { token: work.lease_token, expiresAt: work.lease_expires_at },
           });
           summary[outcome]++;

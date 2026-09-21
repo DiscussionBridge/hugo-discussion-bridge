@@ -24,7 +24,8 @@ function sourceTopic() {
     publication: {},
     publication_revision: publicationRevision,
     destination: {
-      state: "ready", reasons: [], destination_container_id: "topics", destination_terms: [],
+      state: "ready", reasons: [], destination_container_id: "topics",
+      destination_terms: [{ destination_taxonomy_id: "section", destination_term_id: "pledge" }],
       destination_author_id: "hugo:service", authorship_policy: "service_author",
       presentation_mode: "native", slug_policy: "topic_id", mapping_revision: mappingRevision,
     },
@@ -57,7 +58,7 @@ test("Hugo forum publication prepares, verifies live output, acknowledges, and r
     contentDir: path.join(root, "content"), siteUrl: "https://hugo.example.com/",
     stateFile: path.join(root, "state", "forum.json"),
     config: { serverUrl: "https://bridge.example.com", connectionId: "dbc_1234567890abcdef12345678", connectionSecret: "s".repeat(44), lane: "hugo-obbba" },
-    bridge,
+    bridge, sections: [{ id: "pledge", label: "Pledge", path: "/sections/pledge/" }],
   };
   assert.deepEqual(await prepareForumPublications(options), {
     created: 1, updated: 0, unchanged: 0, held: 0, unpublished: 0, failed: 0, errors: [], requires_build: true,
@@ -68,6 +69,7 @@ test("Hugo forum publication prepares, verifies live output, acknowledges, and r
   assert.match(generated, new RegExp(publicationRevision));
   assert.match(generated, /date = "2026-09-19T16:00:00.000Z"/u);
   assert.match(generated, /lastmod = "2026-09-20T17:00:00.000Z"/u);
+  assert.match(generated, /discussionbridge_section = "pledge"/u);
   assert.doesNotMatch(generated, /dbc_123456|ssssssss/);
 
   const publicHtml = `<meta content="${resourceId}" name=discussionbridge-resource-id><meta name=discussionbridge-publication-revision content="${publicationRevision}">`;
@@ -122,6 +124,7 @@ test("Hugo queued publication preserves its static lease through public verifica
     contentDir: path.join(root, "content"), siteUrl: "https://hugo.example.com/",
     stateFile: path.join(root, "state", "forum.json"),
     config: { serverUrl: "https://bridge.example.com", lane: "hugo-obbba" }, bridge,
+    sections: [{ id: "pledge", label: "Pledge", path: "/sections/pledge/" }],
   };
 
   assert.deepEqual(await prepareQueuedForumPublications(options), {
@@ -168,6 +171,7 @@ test("Hugo forum publication removes a revoked page before sending a bounded ack
     contentDir: path.join(root, "content"), siteUrl: "https://hugo.example.com/",
     stateFile: path.join(root, "state", "forum.json"),
     config: { serverUrl: "https://bridge.example.com", lane: "hugo-obbba" }, bridge,
+    sections: [{ id: "pledge", label: "Pledge", path: "/sections/pledge/" }],
   };
   await prepareForumPublications(options);
   revoked = true;
