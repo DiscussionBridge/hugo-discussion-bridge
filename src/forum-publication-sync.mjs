@@ -294,7 +294,8 @@ export async function prepareForumPublications({ contentDir, siteUrl, stateFile,
 
 export async function prepareQueuedForumPublications({ contentDir, siteUrl, stateFile, config, bridge, maximum = 20, sections = [] }) {
   if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 20) throw new Error("Invalid publication work limit");
-  const catalog = await bridge.platformCatalogStatus();
+  const current = await bridge.platformCatalogStatus();
+  const catalog = await bridge.updatePlatformCatalog(hugoPlatformCatalog(sections), current?.catalog_revision || undefined);
   if (catalog?.destination_mapping_state !== "current") throw new Error("Hugo destination mapping requires operator configuration");
   const root = path.resolve(contentDir);
   return withState(stateFile, async (state) => {

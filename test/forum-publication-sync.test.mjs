@@ -97,9 +97,14 @@ test("Hugo queued publication preserves its static lease through public verifica
   const detail = { ...item, content_html: "<p>Queued static publication.</p>" };
   const leaseToken = "c".repeat(64);
   let claims = 0;
+  let uploadedCatalog;
   const acknowledgements = [];
   const bridge = {
-    platformCatalogStatus: async () => ({ destination_mapping_state: "current" }),
+    platformCatalogStatus: async () => ({ catalog_revision: "a".repeat(64) }),
+    updatePlatformCatalog: async (catalog, expectedRevision) => {
+      uploadedCatalog = { catalog, expectedRevision };
+      return { destination_mapping_state: "current" };
+    },
     claimPublicationWork: async (seconds) => ({
       publication_work: claims++ === 0 ? {
         topic_id: item.topic_id, resource_id: null, action: "publish", reason: "source_changed",
@@ -132,6 +137,10 @@ test("Hugo queued publication preserves its static lease through public verifica
     errors: [], requires_build: true, requires_finalize: true,
   });
   assert.equal(claims, 2);
+  assert.equal(uploadedCatalog.expectedRevision, "a".repeat(64));
+  assert.deepEqual(uploadedCatalog.catalog.taxonomies[0].terms, [
+    { id: "pledge", label: "Pledge", kind: "term" },
+  ]);
 
   const publicHtml = `<meta content="${resourceId}" name=discussionbridge-resource-id><meta name=discussionbridge-publication-revision content="${publicationRevision}">`;
   assert.deepEqual(await finalizeForumPublications({

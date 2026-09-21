@@ -1,6 +1,6 @@
 {
   "name": "hugo-discussion-bridge",
-  "version": "0.2.0-alpha.28",
+  "version": "0.2.0-alpha.29",
   "description": "Build-time DiscussionBridge adapter for Hugo",
   "type": "module",
   "bin": {
