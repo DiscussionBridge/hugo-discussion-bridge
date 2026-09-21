@@ -17,7 +17,7 @@ export function hugoPlatformCatalog(rawSections = []) {
     containers: [{ id: "topics", label: "Topics", kind: "section", path: "/topics/", taxonomy_ids: sections.length ? ["section"] : [] }],
     taxonomies: sections.length ? [{
       id: "section", label: "Sections", kind: "taxonomy",
-      terms: sections.map(({ id, label, path: sectionPath }) => ({ id, label, kind: "term", path: sectionPath })),
+      terms: sections.map(({ id, label }) => ({ id, label, kind: "term" })),
     }] : [],
     authors: [{ id: "hugo:service", label: "Hugo build service", kind: "author" }],
     service_author_id: "hugo:service",
