@@ -1,5 +1,23 @@
 # DiscussionBridge for Hugo
 
+## Imported rich content
+
+The adapter ships `dist/discussionbridge-rich-content.js`. Every Hugo consumer
+that materializes a forum publication must copy that exact file to
+`static/discussionbridge/rich-content.js` and load it with a deferred script on
+the native publication layout:
+
+```html
+<script src="/discussionbridge/rich-content.js" defer></script>
+```
+
+The local bundle renders Discourse Mermaid blocks in strict security mode,
+renders cooked math and supported `[math]`, `$$...$$`, and inline `$...$`
+forms, and makes `.md-table` wrappers horizontally scrollable. It uses no CDN
+or receiver credential and leaves math-looking text inside code examples
+literal. Shipping the adapter file without installing and loading it in the
+Hugo consumer is not a complete rich-content installation.
+
 ```sh
 git clone https://github.com/DiscussionBridge/hugo-discussion-bridge.git
 ```

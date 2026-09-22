@@ -25,6 +25,14 @@ test("package and runtime versions are identical", async () => {
   assert.equal(lock.packages[""].version, PRODUCT_VERSION);
 });
 
+test("installed rich-content asset covers Discourse tables, Mermaid, and math", async () => {
+  const asset = await readFile(new URL("../dist/discussionbridge-rich-content.js", import.meta.url), "utf8");
+  assert.match(asset, /discussionbridge-mermaid/u);
+  assert.match(asset, /discussionbridge-math/u);
+  assert.match(asset, /\.md-table/u);
+  assert.match(asset, /mathml/u);
+});
+
 test("CLI recovers one exact legacy URL-derived identity without inventing one", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-recover-id-"));
   const statePath = path.join(dir, "state.json");
@@ -496,7 +504,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge mode="from_discourse"/);
   assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.2\.0-alpha\.29"/);
+  assert.match(output, new RegExp(`discussionbridge_adapter_version = "${PRODUCT_VERSION.replaceAll(".", "\\.")}"`));
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 
