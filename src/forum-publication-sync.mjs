@@ -4,6 +4,7 @@ import path from "node:path";
 import { lock } from "proper-lockfile";
 import sanitizeHtml from "sanitize-html";
 import { PRODUCT_VERSION } from "./version.mjs";
+import { MAX_FORUM_PUBLICATION_HTML_BYTES } from "./publication-limits.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const REVISION = /^[a-f0-9]{64}$/u;
@@ -24,7 +25,7 @@ export function hugoPlatformCatalog(rawSections = []) {
     service_author_id: "hugo:service",
     presentation_modes: ["simple", "full", "fullInteractive", "native"],
     capabilities: { updates: true, unpublish: true, drafts: true },
-    limits: { content_bytes: 49_152, title_bytes: 255, slug_bytes: 191 },
+    limits: { content_bytes: MAX_FORUM_PUBLICATION_HTML_BYTES, title_bytes: 255, slug_bytes: 191 },
     inventory: { authors_complete: true, terms_complete: true, authors_observed: 1, terms_observed: sections.length },
   };
 }
@@ -47,7 +48,7 @@ function sameSource(summary, detail) {
 }
 
 function sourceHtml(value) {
-  if (typeof value !== "string" || !value.trim() || Buffer.byteLength(value) > 49_152) throw new Error("Invalid source content");
+  if (typeof value !== "string" || !value.trim() || Buffer.byteLength(value) > MAX_FORUM_PUBLICATION_HTML_BYTES) throw new Error("Invalid source content");
   const clean = sanitizeHtml(value, {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2"]),
     allowedAttributes: { a: ["href", "title", "rel"], img: ["src", "alt", "title", "width", "height"], code: ["class"], pre: ["class"], span: ["class"], div: ["class"] },
