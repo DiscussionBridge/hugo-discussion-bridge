@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { ForumBridgeClient } from "../src/forum-bridge-client.mjs";
-import { finalizeForumPublications, prepareForumPublications, prepareQueuedForumPublications } from "../src/forum-publication-sync.mjs";
+import { finalizeForumPublications, prepareForumPublications, prepareQueuedForumPublications, publicationPlan } from "../src/forum-publication-sync.mjs";
+import { MAX_FORUM_PUBLICATION_HTML_BYTES } from "../src/publication-limits.mjs";
 import { PRODUCT_VERSION } from "../src/version.mjs";
 
 const resourceId = "11111111-1111-4111-8111-111111111111";
@@ -33,6 +34,32 @@ function sourceTopic() {
     },
   };
 }
+
+test("Hugo forum publication accepts the exact 256 KiB boundary and rejects one byte more", () => {
+  for (const html of ["x".repeat(MAX_FORUM_PUBLICATION_HTML_BYTES), "é".repeat(MAX_FORUM_PUBLICATION_HTML_BYTES / 2)]) {
+    const item = { ...sourceTopic(), content_bytes: Buffer.byteLength(html) };
+    const plan = publicationPlan(
+      item,
+      { ...item, content_html: html },
+      "https://hugo.example.com/",
+      "https://bridge.example.com",
+      [{ id: "pledge", label: "Pledge", path: "/sections/pledge/" }]
+    );
+    assert.equal(Buffer.byteLength(plan.html), MAX_FORUM_PUBLICATION_HTML_BYTES);
+  }
+  const oversized = "x".repeat(MAX_FORUM_PUBLICATION_HTML_BYTES + 1);
+  const item = { ...sourceTopic(), content_bytes: Buffer.byteLength(oversized) };
+  assert.throws(
+    () => publicationPlan(
+      item,
+      { ...item, content_html: oversized },
+      "https://hugo.example.com/",
+      "https://bridge.example.com",
+      [{ id: "pledge", label: "Pledge", path: "/sections/pledge/" }]
+    ),
+    /Invalid source content/u
+  );
+});
 
 test("Hugo forum publication prepares, verifies live output, acknowledges, and retries unchanged", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-forum-"));
