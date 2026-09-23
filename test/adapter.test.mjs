@@ -502,7 +502,7 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"/);
   assert.match(output, /discussionbridge_source_revision = "post:149:version:1"/);
   assert.match(output, /discussionbridge mode="from_discourse"/);
-  assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
+  assert.match(output, /summary = "Published with DiscussionBridge from the Repeal OBBBA Forum\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
   assert.match(output, new RegExp(`discussionbridge_adapter_version = "${PRODUCT_VERSION.replaceAll(".", "\\.")}"`));
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);

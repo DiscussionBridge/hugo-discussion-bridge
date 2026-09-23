@@ -93,11 +93,20 @@ export class ForumBridgeClient {
       clearTimeout(timer);
     }
     if (response.url && new URL(response.url).origin !== this.config.serverUrl) throw new Error("DiscussionBridge response changed origin");
-    if (!(response.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) throw new Error("DiscussionBridge response is not JSON");
+    const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
     const declared = Number(response.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > maximumBytes) throw new Error("DiscussionBridge response is too large");
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength > maximumBytes) throw new Error("DiscussionBridge response is too large");
+    if (!contentType.startsWith("application/json")) {
+      if (!response.ok) {
+        const error = new Error("DiscussionBridge rejected the request");
+        error.status = response.status;
+        error.reason = response.status === 429 ? "rate_limited" : "http_error";
+        throw error;
+      }
+      throw new Error("DiscussionBridge response is not JSON");
+    }
     let data;
     try { data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
     catch { throw new Error("DiscussionBridge response JSON is invalid"); }

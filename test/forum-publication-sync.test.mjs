@@ -3,7 +3,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { ForumBridgeClient } from "../src/forum-bridge-client.mjs";
 import { finalizeForumPublications, prepareForumPublications, prepareQueuedForumPublications } from "../src/forum-publication-sync.mjs";
+import { PRODUCT_VERSION } from "../src/version.mjs";
 
 const resourceId = "11111111-1111-4111-8111-111111111111";
 const publicationRevision = "a".repeat(64);
@@ -70,6 +72,8 @@ test("Hugo forum publication prepares, verifies live output, acknowledges, and r
   assert.match(generated, /date = "2026-09-19T16:00:00.000Z"/u);
   assert.match(generated, /lastmod = "2026-09-20T17:00:00.000Z"/u);
   assert.match(generated, /discussionbridge_section = "pledge"/u);
+  assert.match(generated, /Published with \[DiscussionBridge\]\(https:\/\/discussionbridge\.dev\/\) from the \[Repeal OBBBA Forum\]/u);
+  assert.doesNotMatch(generated, /The Bridge/u);
   assert.doesNotMatch(generated, /dbc_123456|ssssssss/);
 
   const publicHtml = `<meta content="${resourceId}" name=discussionbridge-resource-id><meta name=discussionbridge-publication-revision content="${publicationRevision}">`;
@@ -88,6 +92,96 @@ test("Hugo forum publication prepares, verifies live output, acknowledges, and r
   assert.deepEqual(await prepareForumPublications(options), {
     created: 0, updated: 0, unchanged: 1, held: 0, unpublished: 0, failed: 0, errors: [], requires_build: false,
   });
+});
+
+test("Hugo queued publication limits one run to eight receiver claims", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-bounded-queue-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const item = sourceTopic();
+  const detail = { ...item, content_html: "<p>Bounded queued publication.</p>" };
+  let claims = 0;
+  const bridge = {
+    platformCatalogStatus: async () => ({
+      catalog_revision: "a".repeat(64), catalog_adapter_id: "hugo-discussion-bridge",
+      catalog_adapter_version: PRODUCT_VERSION,
+    }),
+    updatePlatformCatalog: async () => ({ destination_mapping_state: "current" }),
+    claimPublicationWork: async () => ({ publication_work: {
+      topic_id: item.topic_id, resource_id: null, action: "publish", reason: "source_changed",
+      source_revision: item.source_revision, publication_revision: item.publication_revision,
+      lease_token: (++claims).toString(16).padStart(64, "0"),
+      lease_expires_at: "2099-09-20T18:00:00.000Z", attempt_count: claims,
+    } }),
+    sourceTopic: async () => ({ eligible: true, source_topic: detail }),
+    resolveSourceTopic: async (_topicId, publication) => ({
+      outcome: "resolved", resource_id: resourceId, external_id: publication.external_id,
+      canonical_url: publication.canonical_url, pending_publication_revision: publicationRevision,
+      pending_mapping_revision: mappingRevision,
+    }),
+    failPublicationWork: async () => { throw new Error("failure reporting was not expected"); },
+  };
+  const result = await prepareQueuedForumPublications({
+    contentDir: path.join(root, "content"), siteUrl: "https://hugo.example.com/",
+    stateFile: path.join(root, "state", "forum.json"),
+    config: { serverUrl: "https://bridge.example.com", lane: "hugo-obbba" }, bridge,
+    sections: [{ id: "pledge", label: "Pledge", path: "/sections/pledge/" }],
+  });
+  assert.equal(claims, 8);
+  assert.equal(result.claimed, 8);
+  assert.equal(result.created, 1);
+  assert.equal(result.updated, 7);
+  assert.equal(result.failed, 0);
+});
+
+test("Hugo queued publication defers work while an adapter upgrade reconciles", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-upgrade-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let catalogUpdates = 0;
+  const bridge = {
+    platformCatalogStatus: async () => ({
+      catalog_revision: "a".repeat(64), catalog_adapter_id: "hugo-discussion-bridge",
+      catalog_adapter_version: "0.2.0-alpha.30",
+    }),
+    updatePlatformCatalog: async () => { catalogUpdates++; return { destination_mapping_state: "current" }; },
+    claimPublicationWork: async () => { throw new Error("claims must be deferred"); },
+  };
+  assert.deepEqual(await prepareQueuedForumPublications({
+    contentDir: path.join(root, "content"), siteUrl: "https://hugo.example.com/",
+    stateFile: path.join(root, "state", "forum.json"),
+    config: { serverUrl: "https://bridge.example.com" }, bridge,
+  }), {
+    claimed: 0, created: 0, updated: 0, held: 0, unpublished: 0, failed: 0,
+    errors: [], requires_build: false, requires_finalize: false,
+  });
+  assert.equal(catalogUpdates, 1);
+});
+
+test("Hugo queued publication gracefully defers an unleased rate-limited claim", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "discussionbridge-hugo-rate-limit-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const bridge = {
+    platformCatalogStatus: async () => ({ catalog_revision: "a".repeat(64) }),
+    updatePlatformCatalog: async () => ({ destination_mapping_state: "current" }),
+    claimPublicationWork: async () => { const error = new Error("rate limited"); error.status = 429; throw error; },
+  };
+  const result = await prepareQueuedForumPublications({
+    contentDir: path.join(root, "content"), siteUrl: "https://hugo.example.com/",
+    stateFile: path.join(root, "state", "forum.json"),
+    config: { serverUrl: "https://bridge.example.com" }, bridge,
+  });
+  assert.equal(result.claimed, 0);
+  assert.equal(result.failed, 0);
+});
+
+test("Hugo receiver client preserves a plain-text HTTP rate limit", async () => {
+  const client = new ForumBridgeClient({
+    serverUrl: "https://bridge.example.com", connectionId: "dbc_1234567890abcdef12345678",
+    connectionSecret: "s".repeat(44),
+  }, async () => new Response("rate limited", { status: 429, headers: { "content-type": "text/plain" } }));
+  await assert.rejects(
+    () => client.claimPublicationWork(3600),
+    (error) => error?.status === 429 && error?.reason === "rate_limited",
+  );
 });
 
 test("Hugo queued publication preserves its static lease through public verification", async (t) => {

@@ -50,7 +50,7 @@ export async function syncNativePublications({ contentDir, siteUrl, config, fetc
         const file = path.join(contentDir, `${item.route}.md`);
         const previousFile = existingPublications.get(item.resourceId);
         if (previousFile && previousFile !== path.resolve(file)) throw new PublicationMigrationRequired("Hugo publication URL change requires an explicit migration and redirect.");
-        const publicationSummary = `Published from The Bridge by ${item.authorName}.`;
+        const publicationSummary = `Published with DiscussionBridge from the Repeal OBBBA Forum.`;
         const output = `+++\ntitle = ${JSON.stringify(item.title)}\ndescription = ${JSON.stringify(publicationSummary)}\nsummary = ${JSON.stringify(publicationSummary)}\ndate = ${JSON.stringify(item.updatedAt)}\ndiscussionbridge_mode = "from_discourse"\ndiscussionbridge_resource_id = "${item.resourceId}"\ndiscussionbridge_native_publication = true\ndiscussionbridge_source_author = ${JSON.stringify(item.authorName)}\ndiscussionbridge_source_revision = "${item.revision}"\ndiscussionbridge_adapter_version = "${PRODUCT_VERSION}"\ndiscussionbridge_topic_id = ${item.topicId}\n+++\n\n{{< discussionbridge mode="from_discourse" >}}\n`;
         let prior = null;
         try { prior = await readFile(file, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
@@ -510,7 +510,7 @@ function simpleReply(post, topicUrl, base) {
 function simpleMarkup(replies, topicUrl, truncated, poweredBy, wordmark) {
   const initial = replies.slice(0, 5).join(""); const rest = replies.slice(5);
   const more = rest.length ? `<details class="discussionbridge-simple__more"><summary><span class="discussionbridge-simple__more-closed">Show ${rest.length} more ${rest.length === 1 ? "comment" : "comments"}</span><span class="discussionbridge-simple__more-open">Show fewer comments</span></summary>${rest.join("")}</details>` : "";
-  const limit = truncated ? `<p class="discussionbridge-simple__limit">Showing the first 50 comments. <a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">View the complete discussion on The Bridge</a>.</p>` : "";
+  const limit = truncated ? `<p class="discussionbridge-simple__limit">Showing the first 50 comments. <a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">View the complete discussion on the forum</a>.</p>` : "";
   const attribution = `<div data-discussionbridge-attributions><a class="discussionbridge-powered-by" data-discussionbridge-powered-by href="https://www.discourse.org/powered-by" aria-label="Powered by Discourse" rel="nofollow noopener noreferrer"${poweredBy ? "" : " hidden"}><span>Powered by</span><span class="discussionbridge-powered-by__wordmark">${wordmark}</span></a></div>`;
   const styles = '<style>.discussionbridge-powered-by{display:flex;align-items:center;justify-content:center;gap:.45rem;margin:.8rem auto 0;color:inherit;font-size:.8rem;text-decoration:none;opacity:.72}.discussionbridge-powered-by[hidden]{display:none}.discussionbridge-powered-by__wordmark{display:inline-flex;width:6.4rem;padding:.12rem .28rem;border-radius:.2rem;background:#fff}.discussionbridge-powered-by__wordmark svg{display:block;width:100%;height:auto}</style>';
   return `<div class="discussionbridge-simple__header"><h2>Comments</h2><a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">Open discussion</a></div>${replies.length ? initial + more : '<p class="discussionbridge-simple__empty">No comments yet.</p>'}${limit}${attribution}${styles}`;

@@ -58,7 +58,7 @@ function render(root, replies, topicUrl, origin, truncated) {
   header.append(element("h2", "", "Comments"), link(topicUrl, "Open discussion")); fragment.append(header);
   if (!replies.length) {
     const empty = element("p", "discussionbridge-simple__empty", "No comments yet. ");
-    empty.append(link(topicUrl, "Start the conversation on The Bridge.")); fragment.append(empty);
+    empty.append(link(topicUrl, "Start the conversation on the forum.")); fragment.append(empty);
   } else {
     for (const post of replies.slice(0, INITIAL_REPLIES)) fragment.append(reply(post, topicUrl, origin));
     const remaining = replies.slice(INITIAL_REPLIES);
@@ -70,7 +70,7 @@ function render(root, replies, topicUrl, origin, truncated) {
   }
   if (truncated) {
     const limit = element("p", "discussionbridge-simple__limit", `Showing the first ${MAX_REPLIES} comments. `);
-    limit.append(link(topicUrl, "View the complete discussion on The Bridge"), "."); fragment.append(limit);
+    limit.append(link(topicUrl, "View the complete discussion on the forum"), "."); fragment.append(limit);
   }
   root.replaceChildren(fragment, ...(attributions ? [attributions] : []));
 }

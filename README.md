@@ -97,7 +97,7 @@ discussionbridge-hugo prepare-publication-work \
   --state .discussionbridge/forum-publications.json
 ```
 
-It claims at most 20 changed or withdrawn topics with an exact one-hour static
+It claims at most eight changed or withdrawn topics with an exact one-hour static
 deployment lease, prepares their native Hugo files, and records that lease in
 protected operational state. Build and deploy normally, then run the same
 `finalize-forum-publications` command. Finalization verifies the public revision

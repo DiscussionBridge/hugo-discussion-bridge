@@ -8,6 +8,7 @@ import { PRODUCT_VERSION } from "./version.mjs";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const REVISION = /^[a-f0-9]{64}$/u;
 const LEASE = /^[a-f0-9]{64}$/u;
+const ADAPTER_ID = "hugo-discussion-bridge";
 
 export function hugoPlatformCatalog(rawSections = []) {
   const sections = publicationSections(rawSections);
@@ -34,6 +35,11 @@ function bounded(value, maximum, label) {
 }
 
 function same(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
+
+function escapeHtml(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
 
 function sameSource(summary, detail) {
   return ["topic_id", "topic_url", "title", "source_revision", "content_bytes", "source_created_at", "source_updated_at", "category", "tags", "author", "publication", "publication_revision", "destination"]
@@ -112,7 +118,7 @@ function publicationPlan(item, detail, siteUrl, serverUrl, rawSections = []) {
 
 function content(plan, resourceId) {
   const section = plan.section ? `discussionbridge_section = ${JSON.stringify(plan.section.id)}\n` : "";
-  return `+++\ntitle = ${JSON.stringify(plan.title)}\ndate = ${JSON.stringify(plan.createdAt)}\nlastmod = ${JSON.stringify(plan.updatedAt)}\nurl = ${JSON.stringify(new URL(plan.canonicalUrl).pathname)}\n${section}discussionbridge_native_publication = true\ndiscussionbridge_resource_id = ${JSON.stringify(resourceId)}\ndiscussionbridge_topic_id = ${plan.topicId}\ndiscussionbridge_publication_revision = ${JSON.stringify(plan.publicationRevision)}\ndiscussionbridge_source_revision = ${JSON.stringify(plan.sourceRevision)}\ndiscussionbridge_source_author = ${JSON.stringify(plan.author)}\ndiscussionbridge_adapter_version = ${JSON.stringify(PRODUCT_VERSION)}\n+++\n\n<div class="discussionbridge-native-publication">${plan.html}</div>\n\n<hr>\n\n**Published from [The Bridge](${plan.topicUrl}) by ${plan.author}.**\n`;
+  return `+++\ntitle = ${JSON.stringify(plan.title)}\ndate = ${JSON.stringify(plan.createdAt)}\nlastmod = ${JSON.stringify(plan.updatedAt)}\nurl = ${JSON.stringify(new URL(plan.canonicalUrl).pathname)}\n${section}discussionbridge_native_publication = true\ndiscussionbridge_resource_id = ${JSON.stringify(resourceId)}\ndiscussionbridge_topic_id = ${plan.topicId}\ndiscussionbridge_publication_revision = ${JSON.stringify(plan.publicationRevision)}\ndiscussionbridge_source_revision = ${JSON.stringify(plan.sourceRevision)}\ndiscussionbridge_source_author = ${JSON.stringify(plan.author)}\ndiscussionbridge_adapter_version = ${JSON.stringify(PRODUCT_VERSION)}\n+++\n\n<div class="discussionbridge-native-publication">${plan.html}</div>\n\n<hr>\n\n**Published with [DiscussionBridge](https://discussionbridge.dev/) from the [Repeal OBBBA Forum](${plan.topicUrl})**\n\n<p>Source author: ${escapeHtml(plan.author)} · DiscussionBridge for Hugo ${PRODUCT_VERSION}</p>\n`;
 }
 
 async function atomicWrite(file, value) {
@@ -292,14 +298,17 @@ export async function prepareForumPublications({ contentDir, siteUrl, stateFile,
   });
 }
 
-export async function prepareQueuedForumPublications({ contentDir, siteUrl, stateFile, config, bridge, maximum = 20, sections = [] }) {
+export async function prepareQueuedForumPublications({ contentDir, siteUrl, stateFile, config, bridge, maximum = 8, sections = [] }) {
   if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 20) throw new Error("Invalid publication work limit");
   const current = await bridge.platformCatalogStatus();
+  const adapterChanged = Boolean(current?.catalog_adapter_id) &&
+    (current.catalog_adapter_id !== ADAPTER_ID || current.catalog_adapter_version !== PRODUCT_VERSION);
   const catalog = await bridge.updatePlatformCatalog(hugoPlatformCatalog(sections), current?.catalog_revision || undefined);
   if (catalog?.destination_mapping_state !== "current") throw new Error("Hugo destination mapping requires operator configuration");
   const root = path.resolve(contentDir);
   return withState(stateFile, async (state) => {
     const summary = { claimed: 0, created: 0, updated: 0, held: 0, unpublished: 0, failed: 0, errors: [], requires_build: false, requires_finalize: false };
+    if (adapterChanged) return summary;
     const now = Date.now();
     for (const publication of Object.values(state.publications)) {
       if (!["pending_publish", "pending_hold", "pending_unpublish"].includes(publication.state) || !publication.lease_token) continue;
@@ -313,7 +322,13 @@ export async function prepareQueuedForumPublications({ contentDir, siteUrl, stat
     }
 
     for (let index = 0; index < maximum; index++) {
-      const work = validateClaim(await bridge.claimPublicationWork(3600));
+      let work;
+      try {
+        work = validateClaim(await bridge.claimPublicationWork(3600));
+      } catch (error) {
+        if (error?.status === 429) break;
+        throw error;
+      }
       if (work === null) break;
       summary.claimed++;
       try {
