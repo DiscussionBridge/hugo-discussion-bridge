@@ -1,6 +1,6 @@
 {
   "name": "hugo-discussion-bridge",
-  "version": "0.2.0-alpha.21",
+  "version": "0.2.0-alpha.31",
   "description": "Build-time DiscussionBridge adapter for Hugo",
   "type": "module",
   "bin": {
@@ -9,7 +9,7 @@
   "scripts": {
     "build": "esbuild src/browser-simple.mjs --bundle --format=iife --minify --outfile=dist/discussionbridge-simple.js",
     "test": "node --test",
-    "check": "node --check src/adapter.mjs && node --check src/cli.mjs && node --check src/browser-simple.mjs && node --check src/operational-state.mjs && node --check scripts/verify-segmented-render.mjs",
+    "check": "node --check src/adapter.mjs && node --check src/cli.mjs && node --check src/browser-simple.mjs && node --check src/forum-bridge-client.mjs && node --check src/forum-publication-sync.mjs && node --check src/operational-state.mjs && node --check scripts/verify-segmented-render.mjs",
     "verify:large-site": "node scripts/verify-segmented-render.mjs",
     "prepack": "npm run build"
   },

@@ -1,5 +1,23 @@
 # DiscussionBridge for Hugo
 
+## Imported rich content
+
+The adapter ships `dist/discussionbridge-rich-content.js`. Every Hugo consumer
+that materializes a forum publication must copy that exact file to
+`static/discussionbridge/rich-content.js` and load it with a deferred script on
+the native publication layout:
+
+```html
+<script src="/discussionbridge/rich-content.js" defer></script>
+```
+
+The local bundle renders Discourse Mermaid blocks in strict security mode,
+renders cooked math and supported `[math]`, `$$...$$`, and inline `$...$`
+forms, and makes `.md-table` wrappers horizontally scrollable. It uses no CDN
+or receiver credential and leaves math-looking text inside code examples
+literal. Shipping the adapter file without installing and loading it in the
+Hugo consumer is not a complete rich-content installation.
+
 ```sh
 git clone https://github.com/DiscussionBridge/hugo-discussion-bridge.git
 ```
@@ -37,10 +55,96 @@ the exact Hugo site origin through its CORS setting.
 The connection secret is read from a protected file. It is never written to
 the Hugo data directory, generated HTML, browser JavaScript, logs or errors.
 
+## Forum-scale publishing from Discourse
+
+The forum-wide workflow is deliberately two phase because Hugo cannot prove a
+static publication is live until its generated site has been deployed. The
+trusted build first prepares native content from the receiver's eligible topic
+feed:
+
+```text
+discussionbridge-hugo prepare-forum-publications \
+  --content-dir content \
+  --site-url https://hugo.example.com/ \
+  --state .discussionbridge/forum-publications.json
+```
+
+Preparation uploads Hugo's bounded destination catalog, fails closed until an
+operator has configured a current destination mapping, resolves stable topic
+and resource identities, and atomically writes sanitized Markdown. It does not
+acknowledge success to the receiver. Build and deploy the Hugo site normally,
+then finalize against the public URLs:
+
+```text
+discussionbridge-hugo finalize-forum-publications \
+  --state .discussionbridge/forum-publications.json
+```
+
+Finalization requires the exact public resource and publication-revision
+markers before acknowledging a healthy destination. Holds and revocations are
+acknowledged only after the old public URL returns 404. Exact retries preserve
+the same native identity; overlapping runs are excluded by the state lock.
+The same protected connection environment variables listed below are required.
+
+The explicit `prepare-forum-publications` command is the bounded initial
+high-water backfill. After that run completes, an unattended static deployment
+uses the durable receiver queue instead of rescanning the forum:
+
+```text
+discussionbridge-hugo prepare-publication-work \
+  --content-dir content \
+  --site-url https://obbba-hugo.demo.discussionbridge.dev/ \
+  --state .discussionbridge/forum-publications.json
+```
+
+It claims at most eight changed or withdrawn topics with an exact one-hour static
+deployment lease, prepares their native Hugo files, and records that lease in
+protected operational state. Build and deploy normally, then run the same
+`finalize-forum-publications` command. Finalization verifies the public revision
+and includes each exact lease in its receiver acknowledgement. Prepare errors
+are reported to the central queue; an unverified or slow deployment remains
+pending for bounded finalize retries and is never falsely acknowledged.
+
+Generated frontmatter uses the Discourse topic creation time as `date` and the
+latest source edit time as `lastmod`. The first-post Discourse author remains
+visible source attribution while the Hugo build service remains the technical
+file owner.
+
 Presentation manifests use the public modes `simple`, `full`, and
 `interactive`. The historical `fullInteractive` token remains accepted as a
 compatibility alias and is normalized to `interactive`; new adapter output and
 examples use only the public name. Unknown modes fail closed.
+
+Each `to_discourse` page must include an immutable `external_id` in the Hugo
+manifest. Store it in that page's front matter as `discussionbridge_external_id`
+and pass it through the manifest template. Generate an ID once for a **new**
+page with `discussionbridge-hugo new-id`; do not regenerate it on builds or
+when the page URL changes. The adapter rejects missing or duplicate IDs before
+contacting Discourse. For a page published by an older adapter, first preserve
+its exact existing `external_id` from the local publication state or receiver
+binding in front matter. Do **not** assign it a new ID: that would risk a
+second record or topic. A URL move remains a separately verified operation;
+changing front matter alone does not migrate the receiver binding.
+
+Before upgrading an existing URL-derived page, recover its exact prior ID from
+the protected operational ledger and then persist the returned value in that
+page's front matter:
+
+```text
+discussionbridge-hugo recover-existing-id \
+  --state .discussionbridge/hugo-publication-state.json \
+  --canonical-url https://hugo.example.com/existing-page/
+```
+
+The command fails unless that exact prior canonical URL identifies one valid
+existing operation. It never generates or writes a replacement ID. If the
+ledger is unavailable, recover the existing ID from the receiver's
+authenticated source binding before upgrading; do not run `new-id`.
+
+```yaml
+discussionbridge_mode: to_discourse
+discussionbridge_external_id: hugo-page:<64-character-hex-value>
+```
 
 ```text
 discussionbridge-hugo prepare \
@@ -106,7 +210,9 @@ discussionbridge-hugo migrate-publication \
 ```
 
 This moves only the matching native file, rejects route/redirect collisions,
-and writes a permanent `301` rule. It does not change The Bridge binding,
+and writes a permanent `301` rule. A direct reverse move removes the exact
+old inverse rule first; any other destination redirect is a conflict requiring
+operator reconciliation. It does not change The Bridge binding,
 build or deploy the site, or verify the live redirect. Pause publication
 synchronization for the cutover; while the old Bridge URL remains active, a
 subsequent sync rejects the moved source instead of recreating the old page.
