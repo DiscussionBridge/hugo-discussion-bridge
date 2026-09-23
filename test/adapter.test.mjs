@@ -20,9 +20,12 @@ const manifest = { site_origin: "https://hugo.example.com", pages: [
 test("package and runtime versions are identical", async () => {
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lock = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
+  const release = JSON.parse(await readFile(new URL("../discussionbridge-release.json", import.meta.url), "utf8"));
   assert.equal(pkg.version, PRODUCT_VERSION);
   assert.equal(lock.version, PRODUCT_VERSION);
   assert.equal(lock.packages[""].version, PRODUCT_VERSION);
+  assert.equal(release.family.version, PRODUCT_VERSION);
+  assert.equal(release.component.version, PRODUCT_VERSION);
 });
 
 test("installed rich-content asset covers Discourse tables, Mermaid, and math", async () => {
