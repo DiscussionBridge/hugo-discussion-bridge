@@ -1,0 +1,6 @@
+# Optional rich-content asset mount, separate from discussion/template choices.
+# Set params.discussionbridge_rich_content = true in the chosen site config.
+# Preserve the site's existing static mounts when adding this one.
+[[module.mounts]]
+  source = 'node_modules/hugo-discussion-bridge/dist/discussionbridge-rich-content.js'
+  target = 'static/discussionbridge/rich-content.js'

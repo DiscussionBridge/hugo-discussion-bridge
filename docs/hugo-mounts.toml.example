@@ -1,0 +1,32 @@
+# Optional operator-selected template integration; npm does not activate this.
+# Merge selected settings; preserve the site's other output formats/mounts.
+[params]
+  discussionbridge_forum_origin = 'https://forum.example'
+  discussionbridge_rich_content = false
+
+[[module.mounts]]
+  source = 'layouts'
+  target = 'layouts'
+[[module.mounts]]
+  source = 'node_modules/hugo-discussion-bridge/layouts'
+  target = 'layouts'
+[[module.mounts]]
+  source = 'static'
+  target = 'static'
+[[module.mounts]]
+  source = 'node_modules/hugo-discussion-bridge/dist/discussionbridge-simple.js'
+  target = 'static/discussionbridge/simple.js'
+
+[mediaTypes.'application/vnd.discussionbridge+json']
+  suffixes = ['json']
+[outputFormats.discussionbridge]
+  mediaType = 'application/vnd.discussionbridge+json'
+  baseName = 'discussionbridge-manifest'
+  isPlainText = true
+  notAlternative = true
+[outputs]
+  home = ['html', 'rss', 'discussionbridge']
+[segments.discussionbridge-manifest]
+  [[segments.discussionbridge-manifest.includes]]
+    kind = 'home'
+    output = 'discussionbridge'

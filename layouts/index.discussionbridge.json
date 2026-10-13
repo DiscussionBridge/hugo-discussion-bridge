@@ -1,0 +1,47 @@
+{{- $pages := slice -}}
+{{- range site.RegularPages -}}
+{{- $current := . -}}
+{{- if and (not $current.Draft) (not ($current.PublishDate.After now)) (or $current.ExpiryDate.IsZero ($current.ExpiryDate.After now)) -}}
+{{- with $current.Params.discussionbridge_mode -}}
+  {{- $page := dict
+    "key" $current.File.ContentBaseName
+    "mode" .
+    "canonical_url" $current.Permalink
+    "title" $current.Title
+  -}}
+  {{- if eq . "to_discourse" -}}
+    {{- $page = merge $page (dict "content_html" $current.Content "published" true "native_publication" ($current.Params.discussionbridge_native_publication | default false)) -}}
+    {{- if and (not $current.Date.IsZero) (not $current.Lastmod.IsZero) -}}
+      {{- $page = merge $page (dict "source_created_at" ($current.Date.Format "2006-01-02T15:04:05Z07:00") "source_updated_at" ($current.Lastmod.Format "2006-01-02T15:04:05Z07:00")) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_resource_id -}}
+    {{- $page = merge $page (dict "resource_id" .) -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_source_edition -}}
+    {{- $page = merge $page (dict "source_edition" .) -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_presentation_mode -}}
+    {{- $page = merge $page (dict "presentation_mode" .) -}}
+  {{- else -}}
+    {{- with site.Params.discussionbridge_presentation_mode -}}
+      {{- $page = merge $page (dict "presentation_mode" .) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_external_id -}}
+    {{- $page = merge $page (dict "external_id" .) -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_topic_id -}}
+    {{- $page = merge $page (dict "topic_id" .) -}}
+  {{- end -}}
+  {{- with $current.Params.authors -}}
+    {{- $page = merge $page (dict "source_authors" .) -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_primary_author_id -}}
+    {{- $page = merge $page (dict "primary_source_author_id" .) -}}
+  {{- end -}}
+  {{- $pages = $pages | append $page -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- dict "site_origin" site.BaseURL "pages" $pages | jsonify -}}

@@ -15,6 +15,7 @@ export async function readOperationalState(file) {
 
 export async function writeOperationalState(file, state) {
   validateState(state);
+  if (state.withdrawalRecovery && Object.keys(state.withdrawalRecovery).length && /(?:^|[\\/])(?:public|static)(?:[\\/]|$)/iu.test(path.resolve(file))) throw new Error("Hugo withdrawal recovery state must stay outside static/public paths.");
   await mkdir(path.dirname(file), { recursive: true });
   const temporary = path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`);
   let handle;
@@ -49,11 +50,11 @@ export async function withOperationalStateLock(file, action, options = {}) {
   }
 }
 
-export function beginAttempt(state, { externalId, canonicalUrl }, now = new Date()) {
+export function beginAttempt(state, { externalId, canonicalUrl, pageKey }, now = new Date()) {
   const prior = state.operations[externalId];
   if (prior && prior.canonicalUrl !== canonicalUrl) throw new Error("Hugo operational state contains a canonical identity collision.");
   const operation = {
-    ...prior, externalId, canonicalUrl,
+    ...prior, externalId, canonicalUrl, ...(pageKey ? { pageKey } : {}),
     correlationId: prior?.correlationId ?? randomUUID(),
     attempts: (prior?.attempts ?? 0) + 1,
     outcome: "pending", retryable: false, reconciliationRequired: false,
@@ -71,6 +72,7 @@ export function completeAttempt(operation, result, now = new Date()) {
   operation.resourceId = result.resource_id;
   operation.topicId = result.topic_id;
   operation.topicUrl = result.topic_url;
+  if (result.source_revision) operation.acceptedSourceRevision = result.source_revision;
   operation.lastSuccessAt = now.toISOString();
   delete operation.lastError;
 }
@@ -82,6 +84,7 @@ export function stageAttemptResult(operation, result) {
   operation.resourceId = result.resource_id;
   operation.topicId = result.topic_id;
   operation.topicUrl = result.topic_url;
+  if (result.source_revision) operation.acceptedSourceRevision = result.source_revision;
   operation.lastError = "Receiver accepted the publication; platform output commit is pending.";
   delete operation.lastSuccessAt;
 }
@@ -116,6 +119,15 @@ function validateState(value) {
     for (const text of [operation.externalId, operation.canonicalUrl, operation.lastError, operation.resourceId, operation.topicUrl]) if (text !== undefined && (typeof text !== "string" || /[\u0000-\u001f\u007f]/u.test(text))) throw new Error("Hugo operational state entry is invalid.");
     if (operation.resourceId !== undefined && !UUID.test(operation.resourceId)) throw new Error("Hugo operational state entry is invalid.");
     if (operation.topicId !== undefined && (!Number.isSafeInteger(operation.topicId) || operation.topicId < 1)) throw new Error("Hugo operational state entry is invalid.");
+    for (const revision of [operation.acceptedSourceRevision, operation.requestedSourceRevision, operation.requestedPreviousRevision]) if (revision !== undefined && revision !== null && (typeof revision !== "string" || !/^[a-f0-9]{64}$/u.test(revision))) throw new Error("Hugo source publication revision state is invalid.");
+  }
+  if (value.withdrawalRecovery !== undefined) {
+    if (!value.withdrawalRecovery || typeof value.withdrawalRecovery !== "object" || Array.isArray(value.withdrawalRecovery) || Object.keys(value.withdrawalRecovery).length > 10000) throw new Error("Hugo withdrawal recovery metadata is invalid.");
+    for (const [key, recovery] of Object.entries(value.withdrawalRecovery)) {
+      const allowed = new Set(["resourceId", "canonicalUrl", "topicId", "forumOrigin", "priorSourceEdition", "presentationMode", "withdrawalEdition", "publicWithdrawalVerified"]);
+      if (Object.keys(recovery ?? {}).some((field) => !allowed.has(field)) || (recovery?.priorSourceEdition !== undefined && !/^[a-f0-9]{64}$/u.test(recovery.priorSourceEdition)) || (recovery?.presentationMode !== undefined && !["simple", "full", "interactive"].includes(recovery.presentationMode))) throw new Error("Hugo withdrawal recovery metadata is invalid.");
+      if (!UUID.test(key) || !recovery || typeof recovery !== "object" || recovery.resourceId !== key || typeof recovery.canonicalUrl !== "string" || !Number.isSafeInteger(recovery.topicId) || recovery.topicId < 1 || typeof recovery.forumOrigin !== "string" || !/^[a-f0-9]{64}$/u.test(recovery.withdrawalEdition ?? "") || recovery.publicWithdrawalVerified !== false || Object.hasOwn(recovery, "content_html") || Object.hasOwn(recovery, "body")) throw new Error("Hugo withdrawal recovery metadata is invalid.");
+    }
   }
   return value;
 }

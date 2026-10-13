@@ -10,7 +10,7 @@ import { prepare, preflight, syncNativePublications } from "../src/adapter.mjs";
 import { readOperationalState, summarizeOperationalState } from "../src/operational-state.mjs";
 import { PRODUCT_VERSION } from "../src/version.mjs";
 
-const config = { serverUrl: "https://bridge.example.com", connectionId: "dbc_0123456789abcdef01234567", connectionSecret: "s".repeat(48), lane: "hugo-demo" };
+const config = { serverUrl: "https://bridge.example.com", connectionId: "dbc_0123456789abcdef01234567", connectionSecret: "s".repeat(48), nativeShortcode: "discussionbridge", lane: "hugo-demo" };
 const manifest = { site_origin: "https://hugo.example.com", pages: [
   { key: "to-bridge", mode: "to_discourse", canonical_url: "https://hugo.example.com/to/", title: "To Bridge", content_html: "<h2>Article</h2>\n<p>Useful content.</p>\n<section class=\"discussionbridge-presentation\"><p>Preparing</p></section>" },
   { key: "from-bridge", mode: "from_discourse", canonical_url: "https://hugo.example.com/from/", title: "From Bridge", resource_id: "11111111-1111-4111-8111-111111111111" },
@@ -23,6 +23,8 @@ test("package and runtime versions are identical", async () => {
   assert.equal(pkg.version, PRODUCT_VERSION);
   assert.equal(lock.version, PRODUCT_VERSION);
   assert.equal(lock.packages[""].version, PRODUCT_VERSION);
+  const shippedLock = JSON.parse(await readFile(new URL("../npm-shrinkwrap.json", import.meta.url), "utf8"));
+  assert.deepEqual(shippedLock, lock);
 });
 
 test("whole-corpus preflight is deterministic and rejects collisions", () => {
@@ -35,12 +37,16 @@ test("whole-corpus preflight is deterministic and rejects collisions", () => {
   assert.throws(() => preflight(manifest, { ...config, lane: "Bad Lane" }), /lane/);
 });
 
-test("manifest mode uses Interactive publicly while accepting the historical token", () => {
+test("manifest mode accepts only canonical Interactive", () => {
   const modes = preflight({ site_origin: "https://hugo.example.com", pages: [
     { key: "interactive", mode: "interactive", canonical_url: "https://hugo.example.com/interactive/", title: "Interactive" },
-    { key: "legacy", mode: "fullInteractive", canonical_url: "https://hugo.example.com/legacy/", title: "Legacy" },
   ] }, { ...config });
-  assert.deepEqual(modes.map((page) => page.mode), ["interactive", "interactive"]);
+  assert.deepEqual(modes.map((page) => page.mode), ["interactive"]);
+  for (const mode of ["fullInteractive", "full_interactive"]) {
+    assert.throws(() => preflight({ site_origin: "https://hugo.example.com", pages: [
+      { key: "rejected", mode, canonical_url: "https://hugo.example.com/rejected/", title: "Rejected" },
+    ] }, { ...config }), /unsupported mode/);
+  }
   assert.throws(() => preflight({ site_origin: "https://hugo.example.com", pages: [
     { key: "unknown", mode: "bridge", canonical_url: "https://hugo.example.com/unknown/", title: "Unknown" },
   ] }, { ...config }), /unsupported mode/);
@@ -327,9 +333,9 @@ test("native publication creates once, retries unchanged, and skips presentation
   assert.match(output, /discussionbridge_resource_id = "33333333-3333-4333-8333-333333333333"/);
   assert.match(output, /discussionbridge_source_revision = "post:149:version:1"/);
   assert.match(output, /discussionbridge mode="from_discourse"/);
-  assert.match(output, /summary = "Published from The Bridge by DiscussionBridge\."/);
+  assert.match(output, /summary = "Published from https:\/\/bridge\.example\.com by DiscussionBridge\."/);
   assert.match(output, /discussionbridge_source_author = "DiscussionBridge"/);
-  assert.match(output, /discussionbridge_adapter_version = "0\.2\.0-alpha\.20"/);
+  assert.ok(output.includes(`discussionbridge_adapter_version = "${PRODUCT_VERSION}"`));
   assert.doesNotMatch(output, /Published from \[The Bridge\]/);
   assert.doesNotMatch(output, /connectionSecret|X-DiscussionBridge-Secret/);
 });

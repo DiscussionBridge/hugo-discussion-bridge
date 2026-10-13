@@ -1,0 +1,2 @@
+# Keep generated browser assets at their build tool's native line endings.
+dist/*.js text eol=lf

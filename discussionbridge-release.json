@@ -1,12 +1,19 @@
 {
   "family": {
     "name": "DiscussionBridge",
-    "version": "0.2.0-alpha.20"
+    "version": "0.3.0-alpha.1"
   },
   "component": {
     "name": "DiscussionBridge for Hugo",
-    "version": "0.2.0-alpha.20"
+    "version": "0.3.0-alpha.1"
   },
-  "bridgeCompatibility": "0.2",
-  "repository": "https://github.com/DiscussionBridge/hugo-discussion-bridge"
+  "bridgeCompatibility": "0.3",
+  "repository": "https://github.com/DiscussionBridge/hugo-discussion-bridge",
+  "publicationContract": {
+    "version": "0.3.0-alpha.1",
+    "schema": "core-publication-extension.json",
+    "repository": "https://github.com/DiscussionBridge/discussionbridge-adapter-contract",
+    "schema_sha256": "1c9bbe8492a2d46d906a77c2edfd2491719e602bd6f95331efbe777de28cec79",
+    "status": "local-build-candidate"
+  }
 }

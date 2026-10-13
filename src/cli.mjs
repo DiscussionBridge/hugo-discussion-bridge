@@ -17,7 +17,8 @@ const config = {
   serverUrl: process.env.DISCUSSIONBRIDGE_SERVER_URL,
   connectionId: process.env.DISCUSSIONBRIDGE_CONNECTION_ID,
   connectionSecret: (await readFile(secretFile, "utf8")).trim(),
-  lane: process.env.DISCUSSIONBRIDGE_LANE
+  lane: process.env.DISCUSSIONBRIDGE_LANE,
+  nativeShortcode: process.env.DISCUSSIONBRIDGE_HUGO_NATIVE_SHORTCODE
 };
 if (command === "prepare") {
   const result = await prepare({ manifestPath: option("--manifest"), outputPath: option("--output"), statePath: option("--state"), config });
