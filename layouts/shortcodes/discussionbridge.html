@@ -1,0 +1,91 @@
+{{- $requestedMode := .Get "mode" -}}
+{{- if .Page.Params.discussionbridge_withdrawn -}}
+<p class="discussionbridge-withdrawn">Source publication withdrawn.</p>
+{{- else -}}
+{{- $mode := $requestedMode -}}
+{{- $key := .Page.File.ContentBaseName -}}
+{{- $record := index hugo.Data.discussionbridge $key -}}
+{{- $forum := strings.TrimSuffix "/" site.Params.discussionbridge_forum_origin -}}
+{{- $richContent := site.Params.discussionbridge_rich_content | default false -}}
+{{- $sourceMode := "interactive" -}}
+{{- if eq $mode "from_discourse" -}}
+  {{- with .Page.Params.discussionbridge_presentation_mode -}}{{- $sourceMode = . -}}{{- else -}}
+    {{- with site.Params.discussionbridge_presentation_mode -}}{{- $sourceMode = . -}}{{- end -}}
+  {{- end -}}
+  {{- if not (in (slice "simple" "full" "interactive") $sourceMode) -}}{{- errorf "DiscussionBridge source presentation mode %q is unsupported" $sourceMode -}}{{- end -}}
+{{- end -}}
+{{- if ne (printf "%T" $richContent) "bool" -}}
+  {{- errorf "DiscussionBridge discussionbridge_rich_content must be a boolean" -}}
+{{- end -}}
+{{ with $record.cms_verification }}{{ printf "<!--discussionbridge-cms-start:%s-->" .mapping_id | safeHTML }}{{ end }}
+<section class="discussionbridge-presentation" data-discussionbridge-mode="{{ $mode }}"{{ with $record.cms_verification }} data-discussionbridge-cms-resource-id="{{ $record.resource_id }}" data-discussionbridge-cms-native-id="{{ .native_id }}" data-discussionbridge-cms-source-revision="{{ $record.source_revision }}" data-discussionbridge-cms-presentation="{{ $sourceMode }}"{{ with .move_id }} data-discussionbridge-cms-move-id="{{ . }}" data-discussionbridge-cms-proof-nonce="{{ $record.cms_verification.proof_nonce }}" data-discussionbridge-cms-canonical-url="{{ $.Page.Permalink }}"{{ end }}{{ end }}>
+  {{ if eq $mode "simple" }}
+    {{ with $record }}
+      <div
+        class="discussionbridge-simple"
+        data-discussionbridge-simple-live
+        data-discourse-origin="{{ .forum_origin }}"
+        data-topic-id="{{ .topic_id }}"
+        data-topic-url="{{ .topic_url }}"
+      >
+        {{ .simple_html | safeHTML }}
+        <p data-discussionbridge-simple-status hidden>Live comments are temporarily unavailable; showing the most recently published snapshot.</p>
+      </div>
+      <script src="/discussionbridge/simple.js" defer></script>
+    {{ else }}
+      <p class="discussionbridge-unavailable" role="status">Comments are temporarily unavailable.</p>
+    {{ end }}
+  {{ else if eq $mode "full" }}
+    <div class="discussionbridge-header"><h2>Discussion</h2></div>
+    <div id="discourse-comments"></div>
+    <script>
+      {{ with $record }}
+        window.DiscourseEmbed = { discourseUrl: {{ printf "%s/" .forum_origin }}, topicId: {{ .topic_id }} };
+      {{ else }}
+        {{ with $.Page.Params.discussionbridge_topic_id }}
+          window.DiscourseEmbed = { discourseUrl: {{ printf "%s/" $forum }}, topicId: {{ . }} };
+        {{ else }}
+          window.DiscourseEmbed = { discourseUrl: {{ printf "%s/" $forum }}, discourseEmbedUrl: {{ $.Page.Permalink }} };
+        {{ end }}
+      {{ end }}
+      (() => { const script = document.createElement("script"); script.async = true; script.src = {{ printf "%s/javascripts/embed.js" $forum }}; document.body.appendChild(script); })();
+    </script>
+  {{ else if or (eq $mode "interactive") (eq $mode "from_discourse") }}
+    {{ with $record }}
+      {{ if eq $mode "from_discourse" }}
+        {{ with $.Page.Params.discussionbridge_source_revision }}{{ if ne . $record.source_revision }}{{ errorf "DiscussionBridge source revision is stale; regenerate the native preparation before the final build" }}{{ end }}{{ end }}
+        {{ with $.Page.Params.discussionbridge_resource_id }}{{ if ne . $record.resource_id }}{{ errorf "DiscussionBridge prepared resource does not match the native page" }}{{ end }}{{ end }}
+        <article class="discussionbridge-from">{{ .content_html | safeHTML }}</article>
+        <aside class="discussionbridge-publication">
+          <p>Published from <a href="{{ .topic_url }}">{{ .forum_name }}</a>.</p>
+          {{ with $.Page.Params.discussionbridge_source_author }}
+            <p>Source author: {{ . }}{{ with $.Page.Params.discussionbridge_source_revision }} · Revision {{ . }}{{ end }}{{ with $.Page.Params.discussionbridge_adapter_version }} · Hugo {{ hugo.Version }} · DiscussionBridge for Hugo {{ . }}{{ end }}</p>
+          {{ end }}
+        </aside>
+      {{ end }}
+      {{ if and (eq $mode "from_discourse") (eq $sourceMode "simple") }}
+        <div class="discussionbridge-simple" data-discussionbridge-simple-live data-discourse-origin="{{ .forum_origin }}" data-topic-id="{{ .topic_id }}" data-topic-url="{{ .topic_url }}">
+          {{ .simple_html | safeHTML }}
+          <p data-discussionbridge-simple-status hidden>Showing the published comment snapshot while live replies are unavailable.</p>
+        </div>
+        <script src="/discussionbridge/simple.js" defer></script>
+      {{ else }}
+      <div class="discussionbridge-header"><h2>Discussion</h2><a href="{{ .topic_url }}">Open discussion</a></div>
+      <div id="discourse-comments"></div>
+      <script>
+        window.DiscourseEmbed = { discourseUrl: {{ printf "%s/" .forum_origin }}, topicId: {{ .topic_id }}{{ if or (ne $mode "from_discourse") (eq $sourceMode "interactive") }}, fullApp: true, embedHeight: "800px", dynamicHeight: false, embedMinHeight: "360"{{ if eq $mode "from_discourse" }}, className: "discussion-bridge-source-presentation"{{ end }}{{ end }} };
+        (() => { const script = document.createElement("script"); script.async = true; script.src = {{ printf "%s/javascripts/embed.js" .forum_origin }}; document.body.appendChild(script); })();
+      </script>
+      {{ end }}
+    {{ else }}
+      {{ if and (eq $mode "from_discourse") .Page.Params.discussionbridge_native_publication }}{{ errorf "DiscussionBridge native source is not prepared; generate the manifest and run prepare before the final build" }}{{ end }}
+      <p class="discussionbridge-preparing">This Bridge Record is being prepared.</p>
+    {{ end }}
+  {{ else }}
+    {{- errorf "DiscussionBridge mode %q is unsupported" $requestedMode -}}
+  {{ end }}
+  {{ partial "discussionbridge-credit.html" . }}
+</section>
+{{ with $record.cms_verification }}{{ printf "<!--discussionbridge-cms-end:%s-->" .mapping_id | safeHTML }}{{ end }}
+{{ if $richContent }}<script src="/discussionbridge/rich-content.js" defer></script>{{ end }}
+{{- end -}}

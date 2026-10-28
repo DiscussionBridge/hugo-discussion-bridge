@@ -1,0 +1,13 @@
+{{- $page := . -}}
+{{- $owner := false -}}
+{{- with site.Data.discussionbridge_source_moves -}}
+  {{- $owner = index . (crypto.SHA256 $page.File.Path) -}}
+{{- end -}}
+{{- if $owner -}}
+  {{- if or (ne $owner.profile "hugo-to-owned-full-article-1") (ne $owner.native_id $page.File.Path) (ne $owner.canonical_url $page.Permalink) (ne $owner.title $page.Title) (ne $owner.source_file_sha256 (crypto.SHA256 (readFile $page.File.Filename))) (ne $page.Params.discussionbridge_mode "to_discourse") -}}
+    {{- errorf "DiscussionBridge source article ownership differs for %s" $page.File.Path -}}
+  {{- end -}}
+{{ printf "<!--discussionbridge-to-source-start:%s-->" $owner.resource_id | safeHTML }}<article data-discussionbridge-to-profile="{{ $owner.profile }}" data-discussionbridge-to-resource-id="{{ $owner.resource_id }}" data-discussionbridge-to-topic-id="{{ $owner.topic_id }}" data-discussionbridge-to-external-id="{{ $owner.external_id }}" data-discussionbridge-to-native-id="{{ $owner.native_id }}" data-discussionbridge-to-canonical-url="{{ $owner.canonical_url }}" data-discussionbridge-to-source-revision="{{ $owner.source_revision }}" data-discussionbridge-to-source-file-sha256="{{ $owner.source_file_sha256 }}" data-discussionbridge-to-source-content-sha256="{{ $owner.source_content_sha256 }}" data-discussionbridge-to-source-authors-sha256="{{ $owner.source_authors_sha256 }}" data-discussionbridge-to-title="{{ $owner.title }}" data-discussionbridge-to-move-id="{{ $owner.move_id }}" data-discussionbridge-to-proof-nonce="{{ $owner.proof_nonce }}"><h1>{{ $owner.title }}</h1>{{ "<!--discussionbridge-to-source-article-start-->" | safeHTML }}{{ $owner.article_html | safeHTML }}{{ "<!--discussionbridge-to-source-article-end-->" | safeHTML }}</article>{{ printf "<!--discussionbridge-to-source-end:%s-->" $owner.resource_id | safeHTML }}
+{{- else -}}
+  {{ $page.Content }}
+{{- end -}}

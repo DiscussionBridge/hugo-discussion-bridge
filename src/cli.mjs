@@ -1,75 +1,91 @@
 #!/usr/bin/env node
-import { randomBytes } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { migrateNativePublication, prepare, syncNativePublications } from "./adapter.mjs";
-import { ForumBridgeClient } from "./forum-bridge-client.mjs";
-import { finalizeForumPublications, prepareForumPublications, prepareQueuedForumPublications } from "./forum-publication-sync.mjs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { readRegular } from "./native-io.mjs";
+import { parseCmsJson, candidateId, wireVersion } from "./protocol-v4/cms-runtime.mjs";
+import { prepare, preparePublicDiscussions, moveSourceUrl, retrySource } from "./adapter.mjs";
+import { captureLocalRetryAction } from "./to-retry-action.mjs";
+import { runHugoNativeCms, runHugoAttention } from "./cms-native.mjs";
 import { readOperationalState, summarizeOperationalState } from "./operational-state.mjs";
+import { PRODUCT_VERSION } from "./version.mjs";
 
-const args = process.argv.slice(2);
-const command = args.shift();
-if (!new Set(["new-id", "recover-existing-id", "prepare", "sync-publications", "publication-status", "migrate-publication", "prepare-forum-publications", "prepare-publication-work", "finalize-forum-publications"]).has(command)) throw new Error("Usage: discussionbridge-hugo new-id|recover-existing-id|prepare|sync-publications|publication-status|migrate-publication|prepare-forum-publications|prepare-publication-work|finalize-forum-publications [options]");
-const option = (name) => { const index = args.indexOf(name); if (index < 0 || !args[index + 1]) throw new Error(`Missing ${name}.`); return args[index + 1]; };
-const optional = (name) => { const index = args.indexOf(name); return index < 0 ? undefined : args[index + 1]; };
-if (command === "new-id") {
-  if (args.length) throw new Error("new-id accepts no options.");
-  process.stdout.write(`hugo-page:${randomBytes(32).toString("hex")}\n`);
-  process.exit(0);
-}
-if (command === "recover-existing-id") {
-  const state = await readOperationalState(option("--state"));
-  const rawUrl = option("--canonical-url");
-  const canonicalUrl = new URL(rawUrl);
-  if (canonicalUrl.protocol !== "https:" || canonicalUrl.username || canonicalUrl.password ||
-      canonicalUrl.search || canonicalUrl.hash || canonicalUrl.href !== rawUrl) {
-    throw new Error("--canonical-url must be the exact prior HTTPS canonical URL stored by the adapter.");
+const usage = `discussionbridge-hugo ${PRODUCT_VERSION} (${wireVersion}, unpublished development)
+Commands:
+  prepare --config FILE --manifest FILE --output FILE --state FILE
+  retry-source --config FILE --manifest FILE --output FILE --state FILE --key PAGE --refused-mutation UUID
+  sync-publications --config FILE
+  check-attention --config FILE
+  restore-baseline --config FILE --mapping UUID --transaction UUID --operation UUID
+  deploy-restored-baseline --config FILE --mapping UUID --transaction UUID --operation UUID
+  move-presentation --config FILE --mapping UUID --mapping-revision REVISION --new-url HTTPS_URL
+  prepare-public --config FILE --manifest FILE --output FILE
+  source-status --state FILE
+  move-source --config FILE --manifest FILE --state FILE --key PAGE --new-url HTTPS_URL
+  abort-source-move --config FILE --manifest FILE --state FILE --key PAGE --new-url HTTPS_URL
+  version
+Native commands are local structured argv in the protected configuration.`;
+function options(argv) {
+  const result = Object.create(null);
+  for (let i = 0; i < argv.length; i += 2) {
+    const key = argv[i];
+    if (!/^--(?:config|manifest|output|state|key|mapping|mapping-revision|new-url|refused-mutation|transaction|operation)$/u.test(key) || argv[i + 1] === undefined || Object.hasOwn(result, key.slice(2))) throw new Error("Invalid Hugo command options.");
+    result[key.slice(2)] = argv[i + 1];
   }
-  const matches = Object.values(state.operations).filter((operation) => operation.canonicalUrl === canonicalUrl.href);
-  if (matches.length !== 1 || !/^hugo-page:[0-9a-f]{64}$/.test(matches[0].externalId)) {
-    throw new Error("The Hugo publication state does not contain one exact existing identity for that canonical URL.");
+  return result;
+}
+async function configuration(file, connected) {
+  const bytes = await readRegular(path.resolve(file)); if (bytes === null) throw new Error("Hugo configuration is unavailable.");
+  const config = parseCmsJson(bytes, { maximumBytes: 262144 });
+  if (Object.hasOwn(config, "connectionSecret")) throw new Error("Use the protected connectionSecretFile setting.");
+  if (connected) {
+    if (typeof config.connectionSecretFile !== "string" || !path.isAbsolute(config.connectionSecretFile)) throw new Error("An absolute protected connectionSecretFile is required.");
+    const secret = await readRegular(config.connectionSecretFile); if (secret === null) throw new Error("Hugo connection secret file is unavailable.");
+    config.connectionSecret = new TextDecoder("utf-8", { fatal: true }).decode(secret).replace(/\r?\n$/u, "");
   }
-  process.stdout.write(`${matches[0].externalId}\n`);
-  process.exit(0);
+  return config;
 }
-if (command === "publication-status") {
-  process.stdout.write(`${JSON.stringify(summarizeOperationalState(await readOperationalState(option("--state"))))}\n`);
-  process.exit(0);
+export async function runCli(argv, { stdout = process.stdout, stderr = process.stderr } = {}) {
+  const [command, ...args] = argv;
+  if (!command || ["help", "--help"].includes(command)) { stdout.write(usage + "\n"); return 0; }
+  if (command === "version") { stdout.write(JSON.stringify({ version: PRODUCT_VERSION, wire_version: wireVersion, candidate_id: candidateId, release_version: null }) + "\n"); return 0; }
+  try {
+    const value = options(args), required = {
+      prepare: ["config", "manifest", "output", "state"], "sync-publications": ["config"], "prepare-public": ["config", "manifest", "output"],
+      "check-attention": ["config"], "restore-baseline": ["config", "mapping", "transaction", "operation"],
+      "deploy-restored-baseline": ["config", "mapping", "transaction", "operation"],
+      "retry-source": ["config", "manifest", "output", "state", "key", "refused-mutation"],
+      "source-status": ["state"], "move-source": ["config", "manifest", "state", "key", "new-url"],
+      "abort-source-move": ["config", "manifest", "state", "key", "new-url"], "move-presentation": ["config", "mapping", "mapping-revision", "new-url"] }[command];
+    if (!required || required.some((key) => !value[key]) || Object.keys(value).some((key) => !required.includes(key))) throw new Error("Invalid Hugo command options.");
+    let result;
+    if (command === "source-status") result = summarizeOperationalState(await readOperationalState(path.resolve(value.state)));
+    else {
+      const config = await configuration(value.config, command !== "prepare-public");
+      if (command === "sync-publications") result = await runHugoNativeCms({ native: config.native, connectionConfig: config });
+      else if (["check-attention", "restore-baseline", "deploy-restored-baseline"].includes(command)) result = await runHugoAttention({ native: config.native, connectionConfig: config,
+        operation: command === "check-attention" ? "check" : command, mappingId: value.mapping, transactionId: value.transaction, operationId: value.operation });
+      else if (command === "move-presentation") result = await runHugoNativeCms({ native: config.native, connectionConfig: config,
+        presentationMove: { mappingId: value.mapping, expectedMappingRevision: value["mapping-revision"], newUrl: value["new-url"] } });
+      else {
+        const request = { config, manifestPath: path.resolve(value.manifest), ...(value.output ? { outputPath: path.resolve(value.output) } : {}), ...(value.state ? { statePath: path.resolve(value.state) } : {}) };
+        if (command === "prepare") result = (await prepare(request)).status;
+        else if (command === "retry-source") {
+          const localAction = await captureLocalRetryAction({ configPath: path.resolve(value.config), statePath: request.statePath,
+            pageKey: value.key, refusedMutationId: value["refused-mutation"] });
+          result = await retrySource({ ...request, pageKey: value.key, refusedMutationId: value["refused-mutation"], localAction });
+        }
+        else if (command === "prepare-public") result = { prepared_pages: Object.keys(await preparePublicDiscussions(request)).length };
+        else if (["move-source", "abort-source-move"].includes(command)) {
+          const moved = await moveSourceUrl({ ...request, pageKey: value.key, newUrl: value["new-url"], abortMove: command === "abort-source-move" });
+          result = { phase: moved.record ? "committed" : moved.move.state, move_id: moved.move_id ?? moved.move.move_id };
+        }
+      }
+    }
+    stdout.write(JSON.stringify(result) + "\n"); return 0;
+  } catch (error) {
+    // No raw request, secret, source HTML, command output or arbitrary cause is logged.
+    const code = typeof error.code === "string" && /^[a-z_]+$/u.test(error.code) ? error.code : "local_operation_incomplete";
+    stderr.write(`Hugo operation incomplete: ${code}. Inspect protected native state before retrying.\n`); return 1;
+  }
 }
-if (command === "migrate-publication") {
-  const result = await migrateNativePublication({
-    contentDir: option("--content-dir"), siteUrl: option("--site-url"), resourceId: option("--resource-id"),
-    oldUrl: option("--old-url"), newUrl: option("--new-url"), redirectsFile: option("--redirects-file"),
-  });
-  process.stdout.write(`${JSON.stringify(result)}\n`);
-  process.exit(0);
-}
-const secretFile = process.env.DISCUSSIONBRIDGE_CONNECTION_SECRET_FILE;
-if (!secretFile) throw new Error("DISCUSSIONBRIDGE_CONNECTION_SECRET_FILE is required.");
-const config = {
-  serverUrl: new URL(process.env.DISCUSSIONBRIDGE_SERVER_URL).origin,
-  connectionId: process.env.DISCUSSIONBRIDGE_CONNECTION_ID,
-  connectionSecret: (await readFile(secretFile, "utf8")).trim(),
-  lane: process.env.DISCUSSIONBRIDGE_LANE
-};
-const sectionsFile = optional("--sections-file");
-const sections = sectionsFile ? JSON.parse(await readFile(sectionsFile, "utf8")) : [];
-if (command === "prepare-forum-publications" || command === "prepare-publication-work") {
-  const operation = command === "prepare-forum-publications" ? prepareForumPublications : prepareQueuedForumPublications;
-  const result = await operation({
-    contentDir: option("--content-dir"), siteUrl: option("--site-url"), stateFile: option("--state"),
-    config, bridge: new ForumBridgeClient(config), sections,
-  });
-  process.stdout.write(`${JSON.stringify(result)}\n`);
-  if (result.failed) process.exitCode = 1;
-} else if (command === "finalize-forum-publications") {
-  const result = await finalizeForumPublications({ stateFile: option("--state"), bridge: new ForumBridgeClient(config) });
-  process.stdout.write(`${JSON.stringify(result)}\n`);
-  if (result.failed) process.exitCode = 1;
-} else if (command === "prepare") {
-  const result = await prepare({ manifestPath: option("--manifest"), outputPath: option("--output"), statePath: option("--state"), config });
-  process.stdout.write(`Prepared ${result.records} DiscussionBridge records from ${result.pages} Hugo pages.\n`);
-} else {
-  const result = await syncNativePublications({ contentDir: option("--content-dir"), siteUrl: option("--site-url"), config });
-  process.stdout.write(`${JSON.stringify(result)}\n`);
-  if (result.failed) process.exitCode = 1;
-}
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) process.exitCode = await runCli(process.argv.slice(2));

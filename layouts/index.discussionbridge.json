@@ -1,0 +1,45 @@
+{{- $pages := slice -}}
+{{- range site.RegularPages -}}
+{{- $current := . -}}
+{{- $cmsOwned := and (eq $current.Params.discussionbridge_mode "from_discourse") (eq $current.Params.discussionbridge_native_publication true) -}}
+{{- if and (not $cmsOwned) (not $current.Draft) (not ($current.PublishDate.After now)) (or $current.ExpiryDate.IsZero ($current.ExpiryDate.After now)) -}}
+{{- with $current.Params.discussionbridge_mode -}}
+  {{- $page := dict
+    "key" $current.File.ContentBaseName
+    "mode" .
+    "canonical_url" $current.Permalink
+    "title" $current.Title
+  -}}
+  {{- if eq . "to_discourse" -}}
+    {{- $page = merge $page (dict "native_source_file" $current.File.Path "native_source_sha256" (crypto.SHA256 (readFile $current.File.Filename))) -}}
+    {{- if not $current.Date.IsZero -}}{{- $page = merge $page (dict "native_source_created_at" ($current.Date.UTC.Format "2006-01-02T15:04:05.000Z")) -}}{{- end -}}
+    {{- if not $current.Lastmod.IsZero -}}{{- $page = merge $page (dict "native_source_updated_at" ($current.Lastmod.UTC.Format "2006-01-02T15:04:05.000Z")) -}}{{- end -}}
+    {{- $page = merge $page (dict "content_html" $current.Content "published" true "native_publication" ($current.Params.discussionbridge_native_publication | default false)) -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_resource_id -}}
+    {{- $page = merge $page (dict "resource_id" .) -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_presentation_mode -}}
+    {{- $page = merge $page (dict "presentation_mode" .) -}}
+  {{- else -}}
+    {{- with site.Params.discussionbridge_presentation_mode -}}
+      {{- $page = merge $page (dict "presentation_mode" .) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_external_id -}}
+    {{- $page = merge $page (dict "external_id" .) -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_topic_id -}}
+    {{- $page = merge $page (dict "topic_id" (printf "%v" .)) -}}
+  {{- end -}}
+  {{- with $current.Params.authors -}}
+    {{- $page = merge $page (dict "source_authors" .) -}}
+  {{- end -}}
+  {{- with $current.Params.discussionbridge_primary_author_id -}}
+    {{- $page = merge $page (dict "primary_source_author_id" .) -}}
+  {{- end -}}
+  {{- $pages = $pages | append $page -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- dict "site_origin" site.BaseURL "pages" $pages | jsonify -}}

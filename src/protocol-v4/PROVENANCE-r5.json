@@ -1,0 +1,21 @@
+{
+  "wire_version": "v4",
+  "status": "implementation_candidate_not_exact_approved_not_frozen",
+  "schema": {
+    "bytes": 95350,
+    "sha256": "7dee282601e4195459f38b2f2451a5f0f03af39a5f60affc65c49b34664e3f7a"
+  },
+  "implementation_version": "0.4.0-alpha.1",
+  "source": "codex crap/v4/adapter-contract",
+  "candidate_id": "discussionbridge-v4-core-20261015-r5",
+  "javascript": {
+    "bytes": 30606,
+    "sha256": "f10478b83f9c5f6a1ede95bb3e70cfe1dad30684c8f4d869bcbf86b4ddbe8dbc"
+  },
+  "release_version": null,
+  "normative": {
+    "path": "codex crap/v4/adapter-contract/normative/CONTRACT.json",
+    "bytes": 155843,
+    "sha256": "dcea4fb6ad3003e0c81e3aaf0e2c8d38c90270f9754c62e97859d10ead69d4fe"
+  }
+}

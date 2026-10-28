@@ -1,0 +1,11 @@
+{{- $sources := slice -}}
+{{- range site.RegularPages -}}
+{{- $current := . -}}
+{{- with .File -}}
+{{- $published := and (not $current.Draft) (not ($current.PublishDate.After now)) (or $current.ExpiryDate.IsZero ($current.ExpiryDate.After now)) -}}
+{{- $source := dict "source_file" .Path "source_sha256" (crypto.SHA256 (readFile .Filename)) "key" .ContentBaseName "published" $published "to_opted_in" (eq $current.Params.discussionbridge_mode "to_discourse") "native_publication" ($current.Params.discussionbridge_native_publication | default false) -}}
+{{- with $current.Params.discussionbridge_external_id -}}{{- $source = merge $source (dict "external_id" .) -}}{{- end -}}
+{{- $sources = $sources | append $source -}}
+{{- end -}}
+{{- end -}}
+{{- dict "site_origin" site.BaseURL "sources" $sources | jsonify -}}

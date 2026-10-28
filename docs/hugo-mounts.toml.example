@@ -1,0 +1,34 @@
+# Merge the selected native mounts/output into the existing site configuration.
+# This sample does not activate a V4 connection or a public deployment.
+[params]
+  discussionbridge_forum_origin = "https://forum.example"
+  discussionbridge_rich_content = false
+
+[[module.mounts]]
+  source = "layouts"
+  target = "layouts"
+[[module.mounts]]
+  source = "node_modules/hugo-discussion-bridge/layouts"
+  target = "layouts"
+[[module.mounts]]
+  source = "static"
+  target = "static"
+[[module.mounts]]
+  source = "node_modules/hugo-discussion-bridge/dist/discussionbridge-simple.js"
+  target = "static/discussionbridge/simple.js"
+[[module.mounts]]
+  source = "node_modules/hugo-discussion-bridge/dist/discussionbridge-rich-content.js"
+  target = "static/discussionbridge/rich-content.js"
+
+[outputFormats.DiscussionBridge]
+  mediaType = "application/json"
+  baseName = "discussionbridge-manifest"
+  isPlainText = true
+  notAlternative = true
+[outputs]
+  home = ["HTML", "DiscussionBridge"]
+
+# Optional dedicated source capture: normal eligibility is retained.
+[segments.discussionbridge-manifest]
+[[segments.discussionbridge-manifest.includes]]
+  output = "DiscussionBridge"
