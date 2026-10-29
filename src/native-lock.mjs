@@ -4,6 +4,10 @@ import path from "node:path";
 import { safeAncestors, durableDirectory } from "./native-io.mjs";
 const nativeUuid = (value) => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value);
 
+// Outside util-linux's sysexits range: file-open errors must not look like
+// an ordinary nonblocking conflict (EX_CANTCREAT itself is 73).
+const LINUX_LOCK_CONFLICT_EXIT = 200;
+
 async function captureNative(program, args) {
   const child = spawn(program, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
   return await new Promise((resolve) => {
@@ -62,7 +66,7 @@ async function nativeOsLock(lockFile) {
       process.stdin.on('data', (data)=>{ buffer+=data; while(buffer.includes('\\n')) {const end=buffer.indexOf('\\n');const line=buffer.slice(0,end);buffer=buffer.slice(end+1);if(line==='probe')process.stdout.write('{"state":"held"}\\n');} });
       process.stdin.on('end',()=>process.exit(0));`;
     program = "/usr/bin/flock";
-    args = ["--exclusive", "--nonblock", "--conflict-exit-code", "73", "--", lockFile, process.execPath, "--input-type=module", "-e", helper];
+    args = ["--exclusive", "--nonblock", "--conflict-exit-code", String(LINUX_LOCK_CONFLICT_EXIT), "--", lockFile, process.execPath, "--input-type=module", "-e", helper];
   } else if (process.platform === "win32") {
     const encodedPath = Buffer.from(lockFile, "utf8").toString("base64");
     const script = `$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false);
@@ -89,14 +93,22 @@ async function nativeOsLock(lockFile) {
     signal_code: child.signalCode, elapsed_ms: Date.now() - started, lock_file: lockFile,
     events: { ...events }, partial_stdout: buffer.slice(0, 2048), stderr: stderr.slice(0, 4096), stderr_bytes: stderrBytes
   });
-  const helperError = (message) => Object.assign(new Error(message), { native_helper: observation() });
+  const helperError = (message) => {
+    const error = Object.assign(new Error(message), { native_helper: observation() });
+    if (process.platform === "linux" && observedState === null && child.exitCode === LINUX_LOCK_CONFLICT_EXIT) error.code = "ELOCKED";
+    return error;
+  };
   const fail = () => { ended = true; for (const pending of waiting.splice(0)) pending.reject(helperError("CMS mapping is locked or its native OS lock helper is unavailable.")); };
   child.stdin.on("error", fail); // Helper death between probe/check and write must reject safely, not crash the worker on EPIPE.
   child.stderr.on("data", (data) => {
     events.first_stderr_ms ??= Date.now() - started; stderrBytes += data.length;
     if (stderr.length < 4096) stderr += data.toString("utf8").slice(0, 4096 - stderr.length);
   });
-  child.once("error", fail); child.once("exit", fail);
+  child.once("error", fail);
+  // Exit revokes live ownership immediately. Close follows stdout draining,
+  // so a final Windows "busy" line is not discarded by an earlier exit event.
+  child.once("exit", () => { ended = true; });
+  child.once("close", fail);
   child.stdout.on("data", (data) => {
     events.first_stdout_ms ??= Date.now() - started;
     buffer += data.toString("utf8");

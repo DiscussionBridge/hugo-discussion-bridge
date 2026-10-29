@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { withCmsNativeLock } from "../src/native-lock.mjs";
 import { fileFingerprint, nativePath } from "../src/native-io.mjs";
@@ -29,6 +29,23 @@ test("native writer excludes a second owner and releases on errors", async () =>
       });
       throw new Error("fixture interrupted");
     }), /fixture interrupted/);
+    await withCmsNativeLock(root, async (assertHeld) => { await assertHeld(); });
+  });
+});
+
+test("Linux native lock file-open failure is not reported as contention", { skip: process.platform !== "linux" || process.getuid() === 0 }, async () => {
+  await fixture(async (root) => {
+    await withCmsNativeLock(root, async (assertHeld) => { await assertHeld(); });
+    const lockFile = path.join(root, "writer.os-lock");
+    await chmod(lockFile, 0o000);
+    try {
+      await assert.rejects(withCmsNativeLock(root, async () => assert.fail("unreadable lock entered")), (error) => {
+        assert.notEqual(error.code, "ELOCKED");
+        assert.ok(error.native_helper, "the actual native helper failure must remain visible");
+        assert.equal(error.native_helper.observed_state, null);
+        return true;
+      });
+    } finally { await chmod(lockFile, 0o600); }
     await withCmsNativeLock(root, async (assertHeld) => { await assertHeld(); });
   });
 });
