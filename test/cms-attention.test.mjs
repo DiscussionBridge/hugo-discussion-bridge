@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { collectHugoAttention, pollHugoAttention, handoffHugoAttention, restoreHugoAttentionBaseline } from "../src/cms-attention.mjs";
@@ -15,7 +16,8 @@ import { withCmsContinuation } from "../src/cms-continuation.mjs";
 import { connection, mappingId, work, cmsConfig, nativeOrigin, leaseToken } from "../test-support/cms-fixture.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
-const parent = path.resolve("C:/CodeProjects/Products/DiscussionBridge/planning/v4-attention-recovery-fixes-20261025/hugo-fixtures");
+const component = fileURLToPath(new URL("../", import.meta.url));
+const parent = path.join(component, ".tmp", "attention-fixtures");
 async function fixture(t) {
   const root = path.join(parent, randomUUID()), config = { siteRoot: path.join(root, "site"), privateRoot: path.join(root, "private"), siteUrl: nativeOrigin,
     contentRoot: path.join(root, "site", "content"), dataRoot: path.join(root, "site", "data"), publicRoot: path.join(root, "site", "public") };
@@ -176,12 +178,15 @@ test("selected native metadata remains unavailable rather than allowing attentio
   assert.deepEqual(await readFile(f.journalFile),before);assert.equal(f.records.size,0);
 });
 
-test("actual Ruby Core class accepts Hugo restored-baseline facts and rejects mismatched hash/public proof",async(t)=>{
+test("actual shared-plugin Ruby evaluator accepts Hugo restored-baseline facts and rejects mismatched hash/public proof",async(t)=>{
   const f=await fixture(t),observation=await collectHugoAttention(f), file=path.join(f.root,"core-observation.json");
   const observations=[observation,{...observation,current_sha256:hash("changed")},{...observation,verification:null}];
   await writeFile(file,JSON.stringify({inspection:f.inspection,observations}));
-  const ruby="C:/Users/Owner/AppData/Local/Programs/Ruby33-x64-portable/rubyinstaller-3.3.12-1-x64/bin/ruby.exe";
-  const evaluator=path.resolve("../discourse-plugin/lib/discussion_bridge/cms_attention_evidence.rb");
+  const ruby=process.env.DISCUSSIONBRIDGE_RUBY_BINARY || "ruby";
+  const pluginRoot=process.env.DISCUSSIONBRIDGE_TEST_PLUGIN_ROOT
+    ? path.resolve(process.env.DISCUSSIONBRIDGE_TEST_PLUGIN_ROOT)
+    : path.resolve(component,"../discourse-plugin");
+  const evaluator=path.join(pluginRoot,"lib/discussion_bridge/cms_attention_evidence.rb");
   const script=`require 'json'; module DiscussionBridge; module CmsProtocol; def self.canonical(v); case v; when Hash; v.keys.sort.to_h{|k|[k,canonical(v[k])]}; when Array; v.map{|c|canonical(c)}; else v; end; end; def self.semantic_identity(v); JSON.generate(canonical(v)); end; end; end; require ARGV[0]; data=JSON.parse(File.read(ARGV[1])); puts JSON.generate(data.fetch('observations').map{|v|DiscussionBridge::CmsAttentionEvidence.evaluate(data.fetch('inspection'),v,profile:'hugo',publication_kind:'static')});`;
   const {stdout}=await promisify(execFile)(ruby,["-e",script,evaluator,file],{windowsHide:true});
   assert.deepEqual(JSON.parse(stdout).map((row)=>row.status),["ready","not_ready","not_ready"]);

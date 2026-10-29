@@ -8,6 +8,24 @@ creation provenance remains intact, including known r5 records; no old wire
 selector, silent retagging or legacy initialization is included. No native deployment,
 release or formal review qualification is claimed.
 
+## Development checks
+
+Run `npm ci`, `npm test` and `npm run build` from this checkout. The complete
+test entry point requires the native `hugo` executable on PATH (CI uses the
+already-tested extended 0.165.0 release) and Ruby for one shared-plugin
+evaluator fixture. Set `DISCUSSIONBRIDGE_RUBY_BINARY` if Ruby is not on PATH.
+Set `DISCUSSIONBRIDGE_TEST_PLUGIN_ROOT` to the matching shared-plugin checkout;
+by default the fixture uses a sibling `discourse-plugin` directory. CI checks
+out that peer at an explicit commit. The evaluator fixture does not run
+Discourse, Rails or PostgreSQL and does not replace installed integration
+qualification. Its synthetic files/evidence stay in this checkout's `.tmp`.
+
+CI runs the complete tests on Node 22 and 24, builds the ordinary browser
+assets, creates the normal `npm pack` artifact, then installs that artifact in
+an isolated consumer and checks both public imports. No sandbox credential,
+receiver installation, public deployment or live publication is used by those
+checks.
+
 ## Native commands
 
 The package includes layouts/shortcode, browser assets and the private typed

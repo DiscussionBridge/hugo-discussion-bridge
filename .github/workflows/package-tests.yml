@@ -1,0 +1,80 @@
+name: Hugo tests and normal package
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package_tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        node: ['22', '24']
+    env:
+      DISCUSSIONBRIDGE_TEST_PLUGIN_ROOT: ${{ github.workspace }}/discourse-plugin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: hugo
+          persist-credentials: false
+      - name: Check out exact shared-plugin evaluator for the interop fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: DiscussionBridge/discourse-discussion-bridge
+          ref: 82bb84ac4f59cc411e6e7b9c27d851e8f698c6ac
+          path: discourse-plugin
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install the already-used native Hugo version with exact asset integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/hugo-0.165.0-linux-amd64.tar.gz"
+          native_bin="$RUNNER_TEMP/discussionbridge-hugo-bin"
+          curl --fail --location --retry 2 --output "$archive" https://github.com/gohugoio/hugo/releases/download/v0.165.0/hugo_extended_0.165.0_linux-amd64.tar.gz
+          printf '%s  %s\n' f43494894cdf4a8630a201d5c828051c77f523cc66bb3938b30806835470ac20 "$archive" | sha256sum --check --strict
+          mkdir -p "$native_bin"
+          tar -xzf "$archive" -C "$native_bin" hugo
+          echo "$native_bin" >> "$GITHUB_PATH"
+      - name: Report actual native helper versions
+        run: |
+          hugo version
+          ruby --version
+          python3 --version
+      - name: Install locked package dependencies
+        working-directory: hugo
+        run: npm ci
+      - name: Run every existing test, including native Hugo layouts and Ruby evaluator interop
+        working-directory: hugo
+        run: npm test
+      - name: Build ordinary browser assets and package
+        working-directory: hugo
+        run: |
+          npm run build
+          mkdir -p .artifacts
+          npm pack --json --pack-destination .artifacts
+      - name: Install the normal package in an isolated consumer and check public imports
+        working-directory: hugo
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_file=$(node -p "'hugo-discussion-bridge-' + require('./package.json').version + '.tgz'")
+          consumer=$(mktemp -d "$RUNNER_TEMP/hugo-package-consumer-XXXXXX")
+          npm install --prefix "$consumer" --ignore-scripts --no-audit --no-fund "$PWD/.artifacts/$package_file"
+          cd "$consumer"
+          node --input-type=module -e "const adapter = await import('hugo-discussion-bridge'); const cms = await import('hugo-discussion-bridge/cms'); if (typeof adapter.prepare !== 'function' || typeof cms.runHugoNativeCms !== 'function') throw new Error('Normal package public imports are incomplete');"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: hugo-discussion-bridge-node-${{ matrix.node }}-${{ github.sha }}
+          path: hugo/.artifacts/*.tgz
+          if-no-files-found: error
