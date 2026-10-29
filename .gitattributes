@@ -1,1 +1,4 @@
+# Protocol pins, generated bundles and ordinary packages identify exact bytes.
+# Keep checkout/archive line endings independent of machine-level Git settings.
+* -text
 dist/discussionbridge-rich-content.js whitespace=-trailing-space
