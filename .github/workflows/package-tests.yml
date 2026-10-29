@@ -78,4 +78,5 @@ jobs:
         with:
           name: hugo-discussion-bridge-node-${{ matrix.node }}-${{ github.sha }}
           path: hugo/.artifacts/*.tgz
+          include-hidden-files: true
           if-no-files-found: error
