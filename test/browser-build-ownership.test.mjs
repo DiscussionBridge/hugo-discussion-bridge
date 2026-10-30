@@ -11,7 +11,7 @@ test('normal Hugo builder preserves unknown/modified notices and refuses linked 
   const scratch=path.join(repository,'.tmp');fs.mkdirSync(scratch,{recursive:true});
   const root=path.join(scratch,'browser-ownership-'+randomUUID());fs.mkdirSync(root);
   const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
-  for(const name of ['package.json','package-lock.json','scripts/build-browser.mjs','src/browser-simple.mjs','src/browser-rich-content.mjs']) {
+  for(const name of ['package.json','package-lock.json','scripts/build-browser.mjs','scripts/bundled-license.mjs','scripts/managed-output.mjs','src/browser-simple.mjs','src/browser-rich-content.mjs']) {
     const file=path.join(root,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.copyFileSync(path.join(repository,name),file);
   }
   const run=()=>spawnSync(process.execPath,[path.join(root,'scripts/build-browser.mjs')],{cwd:root,encoding:'utf8',windowsHide:true,timeout:90000,env:{...process.env,DISCUSSIONBRIDGE_BUILD_RUNTIME_ROOT:repository}});
@@ -24,6 +24,7 @@ test('normal Hugo builder preserves unknown/modified notices and refuses linked 
   };
   try {
     success(run());
+    assert.equal(hash(fs.readFileSync(path.join(output,'THIRD_PARTY_LICENSES/fastdom_1.0.12.txt'))),'df2ae14f12f31864acef768195afe4584b08a257f25925f49884619279f02f37');
     const unknown=path.join(output,'THIRD_PARTY_LICENSES/operator-note.txt');fs.writeFileSync(unknown,'Keep this file.\n');
     addStale();success(run());assert.equal(fs.existsSync(stale),false);assert.equal(fs.readFileSync(unknown,'utf8'),'Keep this file.\n');
     const cleanLedger=fs.readFileSync(ledger);addStale();fs.appendFileSync(stale,'Operator edit.\n');
@@ -34,7 +35,7 @@ test('normal Hugo builder preserves unknown/modified notices and refuses linked 
     const outside=path.join(root,'must-not-be-created.js');
     try {fs.symlinkSync(outside,bundle,'file');}
     catch(error) {if(process.platform==='win32'&&['EPERM','EACCES'].includes(error.code)){t.diagnostic('Windows does not permit synthetic file symlinks; Linux CI executes this subcase.');return;}throw error;}
-    const linked=run();assert.notEqual(linked.status,0);assert.match(linked.stderr,/Linked generated browser target/);assert.equal(fs.existsSync(outside),false);assert.equal(fs.lstatSync(bundle).isSymbolicLink(),true);
+    const linked=run();assert.notEqual(linked.status,0);assert.match(linked.stderr,/Invalid or linked managed output/);assert.equal(fs.existsSync(outside),false);assert.equal(fs.lstatSync(bundle).isSymbolicLink(),true);
   } finally {
     const resolved=fs.realpathSync(root);assert.equal(path.dirname(resolved),fs.realpathSync(scratch));assert.ok(path.basename(resolved).startsWith('browser-ownership-'));fs.rmSync(resolved,{recursive:true});
   }

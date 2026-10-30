@@ -27,7 +27,7 @@ Its URL/IDNA implementation and MIT notices are bundled inside that runtime;
 `src/protocol-v4/idna/` also carries the dependency manifest and full notices.
 Operators do not install a second URL library or rebuild it on their host.
 Maintainers use `node scripts/refresh-contract.mjs /path/to/reviewed/adapter-contract`
-only with shared commit `b90348f9f010ff58fbe52237eda3187c926334ec`.
+only with shared commit `09d77c0209835c2d996aad294d161f167c7bd838`.
 The offline refresh checks fixed source and fixture hashes, updates only the
 current runtime descriptor, and leaves historical journal provenance alone.
 It does not migrate state or grant authority to own or move a native page.
@@ -36,6 +36,11 @@ Normal browser builds retain local fonts, current package notices and a byte
 ledger in `dist/browser-build-provenance.json`. Rebuilds remove only obsolete
 notices still matching the preceding generated ledger. Unknown files remain;
 modified recorded notices require explicit reconciliation before rebuilding.
+Both bundles are staged until required license sources and all managed output
+paths pass preflight. FastDom's published README license is retained exactly;
+an unavailable required notice is an error, not a package-metadata fallback.
+File-link guard cases execute on Linux CI; unavailable Windows file-link
+privileges are explicitly reported rather than presented as passed cases.
 The real-renderer test uses installed Chrome (or the explicit local executable
 in `DISCUSSIONBRIDGE_BROWSER_EXECUTABLE`) in a fresh headless context, without
 an operator's browser profile. It checks real SVG/MathML, hostile content,

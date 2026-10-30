@@ -6,7 +6,7 @@
   "candidate_id": "discussionbridge-v4-core-20261029-r7",
   "source": {
     "repository": "https://github.com/DiscussionBridge/discussionbridge-adapter-contract",
-    "commit": "b90348f9f010ff58fbe52237eda3187c926334ec"
+    "commit": "09d77c0209835c2d996aad294d161f167c7bd838"
   },
   "normative": {
     "path": "normative/CONTRACT.json",

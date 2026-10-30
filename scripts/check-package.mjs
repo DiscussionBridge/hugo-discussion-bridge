@@ -24,7 +24,7 @@ const fixed={
 };
 for(const [name,hash] of Object.entries(fixed)) if(digest(read('src/protocol-v4/'+name))!==hash) throw new Error(`Wrong frozen shared member: ${name}`);
 const provenance=JSON.parse(read('src/protocol-v4/PROVENANCE.json'));
-if(provenance.source.commit!=='b90348f9f010ff58fbe52237eda3187c926334ec'||provenance.candidate_id!=='discussionbridge-v4-core-20261029-r7'||provenance.release_version!==null) throw new Error('Wrong shared-source pairing');
+if(provenance.source.commit!=='09d77c0209835c2d996aad294d161f167c7bd838'||provenance.candidate_id!=='discussionbridge-v4-core-20261029-r7'||provenance.release_version!==null) throw new Error('Wrong shared-source pairing');
 for(const member of provenance.members) check('src/protocol-v4/'+member.path,member);
 const browser=JSON.parse(read('dist/browser-build-provenance.json'));
 if(browser.packaged_lock_file!=='browser-build-lock.json') throw new Error('Missing inert browser build-lock receipt');
@@ -41,7 +41,10 @@ const expected=new Set(['browser-build-provenance.json','browser-build-lock.json
 for(const notice of browser.bundledPackages) {
   if(expected.has(notice.file)) throw new Error('Repeated browser package notice');
   expected.add(notice.file);check('dist/'+notice.file,notice);
+  if(!['whole-file','pinned-license-section'].includes(notice.licenseSource?.extraction)||!/^[a-f0-9]{64}$/.test(notice.licenseSource?.sha256??'')) throw new Error('Browser notice lacks actual source provenance');
 }
+const fastdom=browser.bundledPackages.filter(item=>item.name==='fastdom');
+if(fastdom.length!==1||fastdom[0].version!=='1.0.12'||fastdom[0].sha256!=='df2ae14f12f31864acef768195afe4584b08a257f25925f49884619279f02f37'||fastdom[0].licenseSource.sha256!=='cc5669ab6f7741bb061c8a7244addc8e3af1f84ec7d2445744b59d0169a87d11') throw new Error('Missing/incomplete actual FastDom notice');
 const census=(base,prefix='')=>fs.readdirSync(base).flatMap(name=>{
   const file=path.join(base,name),stat=fs.lstatSync(file);
   if(stat.isSymbolicLink()) throw new Error('Linked generated browser member');

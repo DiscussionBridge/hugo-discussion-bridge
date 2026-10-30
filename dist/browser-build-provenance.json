@@ -8,8 +8,16 @@
       "sha256": "ab87e1bf6b416be6900c2f76b384a22ca81b32d556eba760413d9aa36fe07f7b"
     },
     "scripts/build-browser.mjs": {
-      "bytes": 5405,
-      "sha256": "80a5e366bd37838a1a7e6df9e7c69db56ed0f64278efcc63aaabb74c276c6f16"
+      "bytes": 6394,
+      "sha256": "94d16806c15330a65fefeb4e7985b2d104f784317d7f08d8a5bd25359eeca319"
+    },
+    "scripts/bundled-license.mjs": {
+      "bytes": 2068,
+      "sha256": "7ce64ff34b1858bb647bff6e91355c636feeeb5f082e709b28b28087a13cd784"
+    },
+    "scripts/managed-output.mjs": {
+      "bytes": 1345,
+      "sha256": "4e9c61aac089e3a20853cd5b8b59482e1609ebc4ff8f875177f92e9f5dbfbe6d"
     },
     "src/browser-simple.mjs": {
       "bytes": 10486,
@@ -37,7 +45,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/_braintree_sanitize-url_7.1.2.txt",
       "bytes": 1066,
-      "sha256": "0984740e0c3d725c8044dec7edcefe1dbce180ef5a7bc710c251e19607000158"
+      "sha256": "0984740e0c3d725c8044dec7edcefe1dbce180ef5a7bc710c251e19607000158",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1066,
+        "sha256": "0984740e0c3d725c8044dec7edcefe1dbce180ef5a7bc710c251e19607000158",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "@iconify/utils",
@@ -45,7 +59,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/_iconify_utils_3.1.7.txt",
       "bytes": 1083,
-      "sha256": "a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf"
+      "sha256": "a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf",
+      "licenseSource": {
+        "file": "license.txt",
+        "bytes": 1083,
+        "sha256": "a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "@mermaid-js/parser",
@@ -53,7 +73,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/_mermaid-js_parser_1.2.1.txt",
       "bytes": 1077,
-      "sha256": "d374061c40bfb6f99c5033290caefda97a9b3e7e477e5ee02f487143ef2177e8"
+      "sha256": "d374061c40bfb6f99c5033290caefda97a9b3e7e477e5ee02f487143ef2177e8",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1077,
+        "sha256": "d374061c40bfb6f99c5033290caefda97a9b3e7e477e5ee02f487143ef2177e8",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "@upsetjs/venn.js",
@@ -61,7 +87,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/_upsetjs_venn.js_2.0.0.txt",
       "bytes": 1106,
-      "sha256": "6a3508febf2cfccfee96597394543a6154a4bb0b1f91f28404be42c09e9fcb54"
+      "sha256": "6a3508febf2cfccfee96597394543a6154a4bb0b1f91f28404be42c09e9fcb54",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1106,
+        "sha256": "6a3508febf2cfccfee96597394543a6154a4bb0b1f91f28404be42c09e9fcb54",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "cose-base",
@@ -69,7 +101,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/cose-base_1.0.3.txt",
       "bytes": 1081,
-      "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a"
+      "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1081,
+        "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "cose-base",
@@ -77,7 +115,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/cose-base_2.2.0.txt",
       "bytes": 1081,
-      "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a"
+      "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1081,
+        "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "cytoscape-cose-bilkent",
@@ -85,7 +129,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/cytoscape-cose-bilkent_4.1.0.txt",
       "bytes": 1084,
-      "sha256": "440fc58a56a12814e417d2b341da89b050da052dc75bdb235607d37ec5fe74ef"
+      "sha256": "440fc58a56a12814e417d2b341da89b050da052dc75bdb235607d37ec5fe74ef",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1084,
+        "sha256": "440fc58a56a12814e417d2b341da89b050da052dc75bdb235607d37ec5fe74ef",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "cytoscape-fcose",
@@ -93,7 +143,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/cytoscape-fcose_2.2.0.txt",
       "bytes": 1079,
-      "sha256": "2837634f403949215760fcdd2fa1ed0c64875d02099ecc8318c704b852f1421d"
+      "sha256": "2837634f403949215760fcdd2fa1ed0c64875d02099ecc8318c704b852f1421d",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1079,
+        "sha256": "2837634f403949215760fcdd2fa1ed0c64875d02099ecc8318c704b852f1421d",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "cytoscape",
@@ -101,7 +157,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/cytoscape_3.34.4.txt",
       "bytes": 1082,
-      "sha256": "eb319c6e6f233607f71e8e2f450391751883cfc0eeb3ca7ef574c13d1d9c2203"
+      "sha256": "eb319c6e6f233607f71e8e2f450391751883cfc0eeb3ca7ef574c13d1d9c2203",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1082,
+        "sha256": "eb319c6e6f233607f71e8e2f450391751883cfc0eeb3ca7ef574c13d1d9c2203",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-array",
@@ -109,7 +171,13 @@
       "license": "BSD-3-Clause",
       "file": "THIRD_PARTY_LICENSES/d3-array_2.12.1.txt",
       "bytes": 1475,
-      "sha256": "0747bebeb06b10954913149be9b9a8bdf6fad3e6fdcbd9f9524e7a94c13d2cea"
+      "sha256": "0747bebeb06b10954913149be9b9a8bdf6fad3e6fdcbd9f9524e7a94c13d2cea",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1475,
+        "sha256": "0747bebeb06b10954913149be9b9a8bdf6fad3e6fdcbd9f9524e7a94c13d2cea",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-array",
@@ -117,7 +185,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-array_3.2.4.txt",
       "bytes": 731,
-      "sha256": "3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4"
+      "sha256": "3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-axis",
@@ -125,7 +199,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-axis_3.0.0.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-brush",
@@ -133,7 +213,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-brush_3.0.0.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-chord",
@@ -141,7 +227,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-chord_3.0.1.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-color",
@@ -149,7 +241,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-color_3.1.0.txt",
       "bytes": 731,
-      "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884"
+      "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-contour",
@@ -157,7 +255,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-contour_4.0.2.txt",
       "bytes": 731,
-      "sha256": "e51cba0e4fa1d8c078e15319868f2b90188f413f9ce9dac1043b62db32901e93"
+      "sha256": "e51cba0e4fa1d8c078e15319868f2b90188f413f9ce9dac1043b62db32901e93",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e51cba0e4fa1d8c078e15319868f2b90188f413f9ce9dac1043b62db32901e93",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-delaunay",
@@ -165,7 +269,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-delaunay_6.0.4.txt",
       "bytes": 757,
-      "sha256": "582c3022bd01942336095f92b58a90b1be624dc547d987555c6c956512dd24c1"
+      "sha256": "582c3022bd01942336095f92b58a90b1be624dc547d987555c6c956512dd24c1",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 757,
+        "sha256": "582c3022bd01942336095f92b58a90b1be624dc547d987555c6c956512dd24c1",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-dispatch",
@@ -173,7 +283,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-dispatch_3.0.1.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-drag",
@@ -181,7 +297,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-drag_3.0.0.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-dsv",
@@ -189,7 +311,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-dsv_3.0.1.txt",
       "bytes": 731,
-      "sha256": "7842a82012622e5a37bfe4f6c1b67cd3bae6350716b5bf87f36cea0bdc1319dc"
+      "sha256": "7842a82012622e5a37bfe4f6c1b67cd3bae6350716b5bf87f36cea0bdc1319dc",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "7842a82012622e5a37bfe4f6c1b67cd3bae6350716b5bf87f36cea0bdc1319dc",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-ease",
@@ -197,7 +325,13 @@
       "license": "BSD-3-Clause",
       "file": "THIRD_PARTY_LICENSES/d3-ease_3.0.1.txt",
       "bytes": 1504,
-      "sha256": "b989d9085148d21ff64a75e14462aefa06b2589a55553b07b1460c70081c7d08"
+      "sha256": "b989d9085148d21ff64a75e14462aefa06b2589a55553b07b1460c70081c7d08",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1504,
+        "sha256": "b989d9085148d21ff64a75e14462aefa06b2589a55553b07b1460c70081c7d08",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-fetch",
@@ -205,7 +339,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-fetch_3.0.1.txt",
       "bytes": 731,
-      "sha256": "ffdc17dc9040006bddeb891c95bfbb492e86d6bc64a4a4233666febab1be35e0"
+      "sha256": "ffdc17dc9040006bddeb891c95bfbb492e86d6bc64a4a4233666febab1be35e0",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "ffdc17dc9040006bddeb891c95bfbb492e86d6bc64a4a4233666febab1be35e0",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-force",
@@ -213,7 +353,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-force_3.0.0.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-format",
@@ -221,7 +367,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-format_3.1.2.txt",
       "bytes": 731,
-      "sha256": "2a6d2d5f32ba0b755ddbc1c833f766e30cdbe6ebe9a6d4e3e24427721f0b63d3"
+      "sha256": "2a6d2d5f32ba0b755ddbc1c833f766e30cdbe6ebe9a6d4e3e24427721f0b63d3",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "2a6d2d5f32ba0b755ddbc1c833f766e30cdbe6ebe9a6d4e3e24427721f0b63d3",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-geo",
@@ -229,7 +381,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-geo_3.1.1.txt",
       "bytes": 1857,
-      "sha256": "3e3edc1224eec9c39cd26491a21304a62883c1e5b6a65c5283ccc7a6cc94baee"
+      "sha256": "3e3edc1224eec9c39cd26491a21304a62883c1e5b6a65c5283ccc7a6cc94baee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1857,
+        "sha256": "3e3edc1224eec9c39cd26491a21304a62883c1e5b6a65c5283ccc7a6cc94baee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-hierarchy",
@@ -237,7 +395,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-hierarchy_3.1.2.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-interpolate",
@@ -245,7 +409,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-interpolate_3.0.1.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-path",
@@ -253,7 +423,13 @@
       "license": "BSD-3-Clause",
       "file": "THIRD_PARTY_LICENSES/d3-path_1.0.9.txt",
       "bytes": 1475,
-      "sha256": "b8265327ab678f554800e71188b1cc6b1ff57522e292d2b1c0be66f27cf328b6"
+      "sha256": "b8265327ab678f554800e71188b1cc6b1ff57522e292d2b1c0be66f27cf328b6",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1475,
+        "sha256": "b8265327ab678f554800e71188b1cc6b1ff57522e292d2b1c0be66f27cf328b6",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-path",
@@ -261,7 +437,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-path_3.1.0.txt",
       "bytes": 731,
-      "sha256": "a09b0d6d76e768fca2085fad05743ee81ddd11946bcda160a3cf5e1081a479aa"
+      "sha256": "a09b0d6d76e768fca2085fad05743ee81ddd11946bcda160a3cf5e1081a479aa",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "a09b0d6d76e768fca2085fad05743ee81ddd11946bcda160a3cf5e1081a479aa",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-polygon",
@@ -269,7 +451,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-polygon_3.0.1.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-quadtree",
@@ -277,7 +465,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-quadtree_3.0.1.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-random",
@@ -285,7 +479,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-random_3.0.1.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-sankey",
@@ -293,7 +493,13 @@
       "license": "BSD-3-Clause",
       "file": "THIRD_PARTY_LICENSES/d3-sankey_0.12.3.txt",
       "bytes": 1471,
-      "sha256": "2bf785e778d67a4f5266cffcd4f2cc5bb98cde73791666e7efeb8002ba32dfa5"
+      "sha256": "2bf785e778d67a4f5266cffcd4f2cc5bb98cde73791666e7efeb8002ba32dfa5",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1471,
+        "sha256": "2bf785e778d67a4f5266cffcd4f2cc5bb98cde73791666e7efeb8002ba32dfa5",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-scale-chromatic",
@@ -301,7 +507,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-scale-chromatic_3.1.0.txt",
       "bytes": 1423,
-      "sha256": "0986d93944902cca9af86824b6a641b4b7c2d10602fc510c433a8bcd443919fe"
+      "sha256": "0986d93944902cca9af86824b6a641b4b7c2d10602fc510c433a8bcd443919fe",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1423,
+        "sha256": "0986d93944902cca9af86824b6a641b4b7c2d10602fc510c433a8bcd443919fe",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-scale",
@@ -309,7 +521,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-scale_4.0.2.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-selection",
@@ -317,7 +535,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-selection_3.0.0.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-shape",
@@ -325,7 +549,13 @@
       "license": "BSD-3-Clause",
       "file": "THIRD_PARTY_LICENSES/d3-shape_1.3.7.txt",
       "bytes": 1475,
-      "sha256": "7eea8533ea92bd8c32a901e89ecb0305890905bb12711449565ddff96891146d"
+      "sha256": "7eea8533ea92bd8c32a901e89ecb0305890905bb12711449565ddff96891146d",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1475,
+        "sha256": "7eea8533ea92bd8c32a901e89ecb0305890905bb12711449565ddff96891146d",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-shape",
@@ -333,7 +563,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-shape_3.2.0.txt",
       "bytes": 731,
-      "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884"
+      "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-time-format",
@@ -341,7 +577,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-time-format_4.1.0.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-time",
@@ -349,7 +591,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-time_3.1.0.txt",
       "bytes": 731,
-      "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884"
+      "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-timer",
@@ -357,7 +605,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-timer_3.0.1.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-transition",
@@ -365,7 +619,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-transition_3.0.1.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3-zoom",
@@ -373,7 +633,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3-zoom_3.0.0.txt",
       "bytes": 731,
-      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "d3",
@@ -381,7 +647,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/d3_7.9.0.txt",
       "bytes": 731,
-      "sha256": "3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4"
+      "sha256": "3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 731,
+        "sha256": "3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "dagre-d3-es",
@@ -389,7 +661,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/dagre-d3-es_7.0.14.txt",
       "bytes": 1328,
-      "sha256": "d01eb84ccce437dbf5fd40853bceea0f287930920acea066597a4a25ead63858"
+      "sha256": "d01eb84ccce437dbf5fd40853bceea0f287930920acea066597a4a25ead63858",
+      "licenseSource": {
+        "file": "LICENSE.md",
+        "bytes": 1328,
+        "sha256": "d01eb84ccce437dbf5fd40853bceea0f287930920acea066597a4a25ead63858",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "dayjs",
@@ -397,7 +675,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/dayjs_1.11.23.txt",
       "bytes": 1072,
-      "sha256": "5faab7526d055651be3aab769d58897be6bd91f3d39d137f25f12dba1b31d5dc"
+      "sha256": "5faab7526d055651be3aab769d58897be6bd91f3d39d137f25f12dba1b31d5dc",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1072,
+        "sha256": "5faab7526d055651be3aab769d58897be6bd91f3d39d137f25f12dba1b31d5dc",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "delaunator",
@@ -405,7 +689,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/delaunator_5.1.0.txt",
       "bytes": 738,
-      "sha256": "0b348fff56384b43dbb37593906904e56d0f9deb51eae590d4dc6d427fbf1808"
+      "sha256": "0b348fff56384b43dbb37593906904e56d0f9deb51eae590d4dc6d427fbf1808",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 738,
+        "sha256": "0b348fff56384b43dbb37593906904e56d0f9deb51eae590d4dc6d427fbf1808",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "dompurify",
@@ -413,7 +703,13 @@
       "license": "(MPL-2.0 OR Apache-2.0)",
       "file": "THIRD_PARTY_LICENSES/dompurify_3.4.17.txt",
       "bytes": 11358,
-      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 11358,
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "es-toolkit",
@@ -421,15 +717,27 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/es-toolkit_1.53.0.txt",
       "bytes": 1077,
-      "sha256": "51f3674294d988d89dbebd31273baaeb3c697a15482d9699b14d1fded2e132a7"
+      "sha256": "51f3674294d988d89dbebd31273baaeb3c697a15482d9699b14d1fded2e132a7",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1077,
+        "sha256": "51f3674294d988d89dbebd31273baaeb3c697a15482d9699b14d1fded2e132a7",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "fastdom",
       "version": "1.0.12",
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/fastdom_1.0.12.txt",
-      "bytes": 106,
-      "sha256": "12dcf376c6a71519c36ddd8dbbf03ad8057c8da796a333c34b6b0b2f6c0f65be"
+      "bytes": 1106,
+      "sha256": "df2ae14f12f31864acef768195afe4584b08a257f25925f49884619279f02f37",
+      "licenseSource": {
+        "file": "README.md",
+        "bytes": 7525,
+        "sha256": "cc5669ab6f7741bb061c8a7244addc8e3af1f84ec7d2445744b59d0169a87d11",
+        "extraction": "pinned-license-section"
+      }
     },
     {
       "name": "internmap",
@@ -437,7 +745,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/internmap_1.0.1.txt",
       "bytes": 726,
-      "sha256": "9ea8903938dab5f12c4572d60725069bec2d1b0dc3bcc210b09bae946a5ebb1f"
+      "sha256": "9ea8903938dab5f12c4572d60725069bec2d1b0dc3bcc210b09bae946a5ebb1f",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 726,
+        "sha256": "9ea8903938dab5f12c4572d60725069bec2d1b0dc3bcc210b09bae946a5ebb1f",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "internmap",
@@ -445,7 +759,13 @@
       "license": "ISC",
       "file": "THIRD_PARTY_LICENSES/internmap_2.0.3.txt",
       "bytes": 726,
-      "sha256": "9ea8903938dab5f12c4572d60725069bec2d1b0dc3bcc210b09bae946a5ebb1f"
+      "sha256": "9ea8903938dab5f12c4572d60725069bec2d1b0dc3bcc210b09bae946a5ebb1f",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 726,
+        "sha256": "9ea8903938dab5f12c4572d60725069bec2d1b0dc3bcc210b09bae946a5ebb1f",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "katex",
@@ -453,14 +773,26 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/katex_0.18.2.txt",
       "bytes": 1107,
-      "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+      "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1107,
+        "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "khroma",
       "version": "2.1.0",
       "file": "THIRD_PARTY_LICENSES/khroma_2.1.0.txt",
       "bytes": 1105,
-      "sha256": "66b333b0f66759a0b710459e03f7029abe17f4358114a128d2c972e642961b49"
+      "sha256": "66b333b0f66759a0b710459e03f7029abe17f4358114a128d2c972e642961b49",
+      "licenseSource": {
+        "file": "license",
+        "bytes": 1105,
+        "sha256": "66b333b0f66759a0b710459e03f7029abe17f4358114a128d2c972e642961b49",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "layout-base",
@@ -468,7 +800,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/layout-base_1.0.2.txt",
       "bytes": 1069,
-      "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf"
+      "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1069,
+        "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "layout-base",
@@ -476,7 +814,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/layout-base_2.0.1.txt",
       "bytes": 1069,
-      "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf"
+      "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1069,
+        "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "lodash-es",
@@ -484,7 +828,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/lodash-es_4.18.1.txt",
       "bytes": 1952,
-      "sha256": "f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc"
+      "sha256": "f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1952,
+        "sha256": "f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "marked",
@@ -492,7 +842,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/marked_16.4.2.txt",
       "bytes": 2942,
-      "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+      "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c",
+      "licenseSource": {
+        "file": "LICENSE.md",
+        "bytes": 2942,
+        "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "mermaid",
@@ -500,7 +856,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/mermaid_11.17.2.txt",
       "bytes": 1089,
-      "sha256": "ec9fb67dcb25eccc416ed56e1aab819222c805a2a4bfe4cb19e7556bf2ffde80"
+      "sha256": "ec9fb67dcb25eccc416ed56e1aab819222c805a2a4bfe4cb19e7556bf2ffde80",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1089,
+        "sha256": "ec9fb67dcb25eccc416ed56e1aab819222c805a2a4bfe4cb19e7556bf2ffde80",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "robust-predicates",
@@ -508,7 +870,13 @@
       "license": "Unlicense",
       "file": "THIRD_PARTY_LICENSES/robust-predicates_3.0.3.txt",
       "bytes": 1210,
-      "sha256": "88d9b4eb60579c191ec391ca04c16130572d7eedc4a86daa58bf28c6e14c9bcd"
+      "sha256": "88d9b4eb60579c191ec391ca04c16130572d7eedc4a86daa58bf28c6e14c9bcd",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1210,
+        "sha256": "88d9b4eb60579c191ec391ca04c16130572d7eedc4a86daa58bf28c6e14c9bcd",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "roughjs",
@@ -516,7 +884,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/roughjs_4.6.6.txt",
       "bytes": 1068,
-      "sha256": "dca9a392272606ac748ac0976a2a1133f14eef841c27beaa51a844d53c56a09d"
+      "sha256": "dca9a392272606ac748ac0976a2a1133f14eef841c27beaa51a844d53c56a09d",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1068,
+        "sha256": "dca9a392272606ac748ac0976a2a1133f14eef841c27beaa51a844d53c56a09d",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "stylis",
@@ -524,7 +898,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/stylis_4.4.0.txt",
       "bytes": 1078,
-      "sha256": "88c579c6ee44b41137a21321190d177982e5b17d4fa1b83a4a2e3ea325a8fc9a"
+      "sha256": "88c579c6ee44b41137a21321190d177982e5b17d4fa1b83a4a2e3ea325a8fc9a",
+      "licenseSource": {
+        "file": "LICENSE",
+        "bytes": 1078,
+        "sha256": "88c579c6ee44b41137a21321190d177982e5b17d4fa1b83a4a2e3ea325a8fc9a",
+        "extraction": "whole-file"
+      }
     },
     {
       "name": "uuid",
@@ -532,7 +912,13 @@
       "license": "MIT",
       "file": "THIRD_PARTY_LICENSES/uuid_14.0.3.txt",
       "bytes": 1109,
-      "sha256": "beaa6b04fb82e41dd2ad679e19e27953afb5999b1abbb455b6564e78ebfeb332"
+      "sha256": "beaa6b04fb82e41dd2ad679e19e27953afb5999b1abbb455b6564e78ebfeb332",
+      "licenseSource": {
+        "file": "LICENSE.md",
+        "bytes": 1109,
+        "sha256": "beaa6b04fb82e41dd2ad679e19e27953afb5999b1abbb455b6564e78ebfeb332",
+        "extraction": "whole-file"
+      }
     }
   ]
 }

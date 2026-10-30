@@ -3,11 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import {managedOutput} from './managed-output.mjs';
 
 if(process.argv.length!==3) throw new Error('Usage: node scripts/refresh-contract.mjs <reviewed-contract-root>');
 const root=fileURLToPath(new URL('../',import.meta.url));
 const source=path.resolve(process.argv[2]);
-const pins={commit:'b90348f9f010ff58fbe52237eda3187c926334ec',candidate:'discussionbridge-v4-core-20261029-r7',
+const pins={commit:'09d77c0209835c2d996aad294d161f167c7bd838',candidate:'discussionbridge-v4-core-20261029-r7',
   normative:'808042688cbde88fac0acdf1187e4cb8c251e13025bfcf09cf3a3c361ca02003',
   runtime:'acdfddf574910fb7e6cf2e2fe6837b3d266e8d93f1d96cee5e7699122d779076',
   schema:'e6a15a6d70f7bc8b8ee82aa22a0b9c2ff1bbf2da6277f7087118be9e026ce5c0',
@@ -39,7 +40,8 @@ const fixtures=Object.entries(fixturePins).map(([name,hash])=>({name,bytes:read(
 const target=path.join(root,'src/protocol-v4');
 const managed=['src','src/protocol-v4','src/protocol-v4/idna','src/protocol-v4/PROVENANCE.json','src/operational-state.mjs','test','test/fixtures','test/fixtures/cms-v4',
   ...members.map(member=>`src/protocol-v4/${member.target}`),...fixtures.map(fixture=>`test/fixtures/cms-v4/${fixture.name}`)];
-for(const name of managed) if(fs.lstatSync(path.join(root,name),{throwIfNoEntry:false})?.isSymbolicLink()) throw new Error('Linked managed target');
+const directories=new Set(['src','src/protocol-v4','src/protocol-v4/idna','test','test/fixtures','test/fixtures/cms-v4']);
+for(const name of managed) managedOutput(root,path.join(root,name),directories.has(name)?'directory':'file');
 const stateFile=path.join(root,'src/operational-state.mjs');
 const state=fs.readFileSync(stateFile,'utf8');
 const pattern=/runtime_sha256: "[a-f0-9]{64}"/g;
