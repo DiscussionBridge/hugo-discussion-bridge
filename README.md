@@ -68,7 +68,7 @@ checks.
 
 The package includes layouts/shortcode, browser assets and the private typed
 runtime. Configure the native mounts/output in docs/NATIVE_INTEGRATION.md.
-Server commands require Node22+ and the existing configured Hugo executable.
+Server commands require Node 22.12 or newer and the existing configured Hugo executable.
 
 ```text
 discussionbridge-hugo prepare --config FILE --manifest FILE --output FILE --state FILE
@@ -263,12 +263,13 @@ await execution; it has no inherited native/package/canary qualification.
 
 ## Private exact artifacts
 
-src/protocol-v4/PROVENANCE.json records unchanged portable artifacts:
-
-| Artifact | Bytes | SHA256 |
-|---|---:|---|
-| cms-schema.json | 115670 | 8563a9b1346e3bf82635bd65a46bb1e25415a1003d7432f8fcb8c1c6e4f03c14 |
-| cms-runtime.mjs | 35144 | e1790fd800abcae9772d327625ea188f04ec68c63ce7917cb0785f5cdea22538 |
+The current byte counts and SHA-256 identities for the private schema, runtime,
+embedded dependencies and notices are recorded in
+[`src/protocol-v4/PROVENANCE.json`](src/protocol-v4/PROVENANCE.json). Use that
+source-bound receipt instead of a separately maintained copy of its values.
+The ordinary package checker verifies those exact identities against the
+packaged files and the pinned shared source; historical state descriptors retain
+their original identities.
 
 Current implementation checks are recorded separately in the successor map.
 Contract reproduction and earlier Hugo results do not qualify a changed native
