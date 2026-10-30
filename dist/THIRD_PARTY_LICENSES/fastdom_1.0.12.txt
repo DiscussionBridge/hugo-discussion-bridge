@@ -1,0 +1,2 @@
+License declared by package: "MIT"
+Source: {"type":"git","url":"git://github.com/wilsonpage/fastdom.git"}

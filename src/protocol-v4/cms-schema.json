@@ -1,13 +1,13 @@
 {
   "implementation_version": "0.4.0-alpha.1",
-  "candidate_id": "discussionbridge-v4-core-20261025-r6",
+  "candidate_id": "discussionbridge-v4-core-20261029-r7",
   "wire_version": "v4",
   "status": "implementation_candidate_not_exact_approved_not_frozen",
   "release_version": null,
   "source_identity": {
     "path": "normative/CONTRACT.json",
-    "bytes": 187682,
-    "sha256": "df31c5d2fc387a8b12b388438450eccd97966de34c82b1bf417634b21a36b495"
+    "bytes": 190024,
+    "sha256": "808042688cbde88fac0acdf1187e4cb8c251e13025bfcf09cf3a3c361ca02003"
   },
   "grammar": "DB-TYPES-1",
   "types": {
@@ -53,7 +53,25 @@
     "Url": {
       "kind": "string",
       "format": "absolute HTTPS URL without userinfo or fragment",
-      "utf8_maximum_bytes": 2048
+      "utf8_maximum_bytes": 2048,
+      "domain_policy": {
+        "id": "db-url-uts46-17-1",
+        "unicode_version": "17.0.0",
+        "check_hyphens": false,
+        "check_bidi": true,
+        "check_joiners": true,
+        "use_std3_ascii_rules": false,
+        "transitional_processing": false,
+        "verify_dns_length": false,
+        "ignore_invalid_punycode": false,
+        "preserve_input_url": true,
+        "authority_facts_only": true
+      },
+      "rules": [
+        "Percent-decode the host once with strict UTF8, apply the pinned domain policy, and reject empty or forbidden decoded/mapped domain code points (C0, space, DEL, percent, # / : < > ? @ [ backslash ] ^ |). Bracketed IPv6 uses its existing IP-literal rule instead of domain processing; numeric domains retain the existing bounded WHATWG IPv4 validation.",
+        "The original URL remains byte-exact. Local rawHost, validated asciiHost and effectivePort are comparison facts only; they do not serialize a replacement URL, re-key stored reservations, normalize article targets or grant source/connection/ownership authority.",
+        "Malformed ACE (including an empty or ASCII-only decoded Punycode label), invalid Bidi and invalid ContextJ are rejected consistently, even if a native URL parser accepts them. Native parser Unicode versions and later URL-standard ASCII bypasses do not override this fixed policy."
+      ]
     },
     "Sha256": {
       "kind": "string",

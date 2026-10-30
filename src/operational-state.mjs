@@ -9,7 +9,7 @@ import { validateToSourceMoves } from "./to-source-move-state.mjs";
 import { validateLocalRetryRecord } from "./to-retry-action.mjs";
 
 export const SOURCE_CANDIDATE = Object.freeze({ candidate_id: candidateId, schema_sha256: cmsSchemaIdentity.sha256,
-  runtime_sha256: "e1790fd800abcae9772d327625ea188f04ec68c63ce7917cb0785f5cdea22538" });
+  runtime_sha256: "acdfddf574910fb7e6cf2e2fe6837b3d266e8d93f1d96cee5e7699122d779076" });
 export const SOURCE_STATE_IDENTITY = Object.freeze({ wire_version: "v4", state_format: "db-hugo-source-state-1" });
 const states = new WeakMap();
 const hash = (bytes) => bytes === null ? null : createHash("sha256").update(bytes).digest("hex");

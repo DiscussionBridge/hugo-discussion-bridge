@@ -1,0 +1,236 @@
+{
+  "format": 1,
+  "component": "discussionbridge-v4-private-js-idna",
+  "namespace": "DiscussionBridgeIdnaPrivate",
+  "unicode_version": "17.0.0",
+  "runtime_packages": [
+    {
+      "name": "@adraffy/ens-normalize",
+      "version": "1.11.1",
+      "integrity": "sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ==",
+      "resolved": "https://registry.npmjs.org/@adraffy/ens-normalize/-/ens-normalize-1.11.1.tgz",
+      "license": "MIT"
+    },
+    {
+      "name": "tr46",
+      "version": "6.0.0",
+      "integrity": "sha512-bLVMLPtstlZ4iMQHpFHTR7GAGj2jxi8Dg0s2h2MafAE4uSWF98FC/3MomU51iQAMf8/qDUbKWf5GxuvvVcXEhw==",
+      "resolved": "https://registry.npmjs.org/tr46/-/tr46-6.0.0.tgz",
+      "license": "MIT"
+    },
+    {
+      "name": "punycode",
+      "version": "2.3.1",
+      "integrity": "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==",
+      "resolved": "https://registry.npmjs.org/punycode/-/punycode-2.3.1.tgz",
+      "license": "MIT"
+    }
+  ],
+  "build_only_tool": {
+    "name": "esbuild",
+    "version": "0.28.1",
+    "integrity": "sha512-HrJrvZv5ayxBzPfwphOoNzkzOIIlifzk0KJrGK2c8R4+LKpMtpYLQeUdjnwjWv/LZlkH2laZk+4w78pi99D4Vw=="
+  },
+  "inputs": [
+    {
+      "path": "js-dependencies/package.json",
+      "bytes": 226,
+      "sha256": "270abdad69e7a2b982b7d4521c326d55d103f6605acb0a84890798058030679f"
+    },
+    {
+      "path": "js-dependencies/package-lock.json",
+      "bytes": 1404,
+      "sha256": "3f1a3db849c8f69fbc22511ee78e22f059814df271cdb35ae002ad551441a49a"
+    },
+    {
+      "path": "js-dependencies/entry.mjs",
+      "bytes": 302,
+      "sha256": "4fb94c24396d89dca1e202c83a5f9c9acbea1ebdb909187d684083e0301f5e7a"
+    },
+    {
+      "path": "js-dependencies/nfc.mjs",
+      "bytes": 360,
+      "sha256": "fae68e8ec9aad44e7578d88476e41906fe7b845cc9936bdffe0d9cff05002c0e"
+    },
+    {
+      "path": "tools/js-idna/package.json",
+      "bytes": 165,
+      "sha256": "a10c439b1246c6d3e4e548a0a149dd5ab4879ebe3f1390ea18d12cc0aca936be"
+    },
+    {
+      "path": "tools/js-idna/package-lock.json",
+      "bytes": 14005,
+      "sha256": "b630ca11faf5897f60f7f3ce1691e332113bd363fbd04749d48baabfe4f40708"
+    },
+    {
+      "path": "scripts/build-js-idna.mjs",
+      "bytes": 8385,
+      "sha256": "fc8a928daa87b5038821c745368d01a36739560387ed0a604da5b65216fad34a"
+    },
+    {
+      "path": "implementation/js-contextj.js.in",
+      "bytes": 898,
+      "sha256": "70ddcf2b88ea6732e4326b5c7604173f69d667ebc49b98e86feadc3fe763ba2e"
+    }
+  ],
+  "transformations": [
+    "private self-contained IIFE; ES2022 target; no external require/import/runtime dependency",
+    "bind exactly two source-hashed tr46 NFC calls to published standalone Unicode17 nf.min.js; no ENS name policy or global prototype patch",
+    "replace exactly one source-hashed ContextJ block with occurrence-anchored validation; advance after every joiner, including virama success",
+    "complete MIT notices embedded for unchanged portable-runtime byte copies; original upstream file hashes retained"
+  ],
+  "upstream_members": [
+    {
+      "path": "node_modules/@adraffy/ens-normalize/LICENSE",
+      "bytes": 1077,
+      "sha256": "3b458813ab3316b16bf004c4201d4a0583cf615514422dabf4d7c025988d613d"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/README.md",
+      "bytes": 8817,
+      "sha256": "7ca27f2d35f21bbce4ac5c80f7e83a1a77f9629dc1479a5689c643c2c171ac5c"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/all.js",
+      "bytes": 74725,
+      "sha256": "1cc83d26c3e212cda3f666937f7702441baea4d7bf4cb7bb403dbc40fc39512b"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/all.min.js",
+      "bytes": 44110,
+      "sha256": "d681b6caae6989a6e0097f196166ebd05b39c1644a86ee2a24c0f6988c473407"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index-xnf.cjs",
+      "bytes": 54349,
+      "sha256": "5d951ee1073f8da1531d00562c5f57ae28b18e4eb0da68a705db85d6ccea61ed"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index-xnf.d.cts",
+      "bytes": 1569,
+      "sha256": "9f1a149181f8dd6f10e73458849d7f5adaaa6a41c8f415b7373bfdf0fcd74df4"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index-xnf.d.mts",
+      "bytes": 1569,
+      "sha256": "9f1a149181f8dd6f10e73458849d7f5adaaa6a41c8f415b7373bfdf0fcd74df4"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index-xnf.min.js",
+      "bytes": 29286,
+      "sha256": "3df6e95b738bc44a05b90601a33856cba7dc664bd34aa89e1402c761b942a0d6"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index-xnf.mjs",
+      "bytes": 54094,
+      "sha256": "e76f29e4cd9e6ec43d93ea1c998fa1771f4343502d91c8ba83640ee880779842"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index.cjs",
+      "bytes": 66173,
+      "sha256": "e9131df7a93064361eb542a9da89422aa5e4f619ad9a64417865d4e07b53c8fa"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index.d.cts",
+      "bytes": 1569,
+      "sha256": "9f1a149181f8dd6f10e73458849d7f5adaaa6a41c8f415b7373bfdf0fcd74df4"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index.d.mts",
+      "bytes": 1569,
+      "sha256": "9f1a149181f8dd6f10e73458849d7f5adaaa6a41c8f415b7373bfdf0fcd74df4"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index.min.js",
+      "bytes": 38280,
+      "sha256": "d19b52ea37e6ed2b19952919febaff209e65deb668eb487ce8c84c58df7ba086"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/index.mjs",
+      "bytes": 65918,
+      "sha256": "6edd9ca24176d6846bb11727d10a165757e05d9a5a40abc06eb2004b98a56f09"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/dist/nf.min.js",
+      "bytes": 10938,
+      "sha256": "c59474820da3247ce57a772fc6e01de9730a8ab1df2e299075320f7c9b0dad1a"
+    },
+    {
+      "path": "node_modules/@adraffy/ens-normalize/package.json",
+      "bytes": 1641,
+      "sha256": "fbc5b24e52963420ec80bdfb24d21e783428afe612545ce4dd8e4a43a2f6dbd7"
+    },
+    {
+      "path": "node_modules/tr46/LICENSE.md",
+      "bytes": 1076,
+      "sha256": "499d6d466d064e0460427967a344e2a32fcb86ea8c6cd1a285ec4f1fa03fba67"
+    },
+    {
+      "path": "node_modules/tr46/README.md",
+      "bytes": 2188,
+      "sha256": "1a616e77167f8bcd6722790a7e40ffa1f735ef510030d8126f51ceb90646df71"
+    },
+    {
+      "path": "node_modules/tr46/index.js",
+      "bytes": 8590,
+      "sha256": "dd2eae4174a287b5a081feba8c41dd85d713d8b5185b5e98313c7ffe83834646"
+    },
+    {
+      "path": "node_modules/tr46/lib/mappingTable.json",
+      "bytes": 142911,
+      "sha256": "c45bd284e01f0845bc3c3b1d7594cd7b9ee8b955ddc850882b8e1dc5d0cba95d"
+    },
+    {
+      "path": "node_modules/tr46/lib/regexes.js",
+      "bytes": 72462,
+      "sha256": "3f43551d5109e5a300b29d5a9c261adf2bfd1621ffc086909f8ebf40835fc70f"
+    },
+    {
+      "path": "node_modules/tr46/lib/statusMapping.js",
+      "bytes": 123,
+      "sha256": "ab7f706a1e3e74f4efd276560bb50e15f71dd0b20f85e87e21d1c18259420064"
+    },
+    {
+      "path": "node_modules/tr46/package.json",
+      "bytes": 1054,
+      "sha256": "3cc81081409bea2f0fd4ec18d64c542a18e0ac6f7f970c7f7be4139aaa8d140f"
+    },
+    {
+      "path": "node_modules/punycode/LICENSE-MIT.txt",
+      "bytes": 1077,
+      "sha256": "483acb265f182907d1caf6cff9c16c96f31325ed23792832cc5d8b12d5f88c8a"
+    },
+    {
+      "path": "node_modules/punycode/README.md",
+      "bytes": 5719,
+      "sha256": "ab87f92cff7bfac2644eee44b469b263f7a147b6e5e8c15627164890a249c2be"
+    },
+    {
+      "path": "node_modules/punycode/package.json",
+      "bytes": 1227,
+      "sha256": "e025033bd11110af671fb8eb62f0db8895073ccdca70b596aa94a27eb5bf9acb"
+    },
+    {
+      "path": "node_modules/punycode/punycode.es6.js",
+      "bytes": 12780,
+      "sha256": "8969ae1b78644a33574be197d1a7a9c85b031092f1c1a657d865b7b3c1edd77e"
+    },
+    {
+      "path": "node_modules/punycode/punycode.js",
+      "bytes": 12711,
+      "sha256": "6052a80eac47e46bd4de17ae0095e0192c336d3d7c387d292ad2176ebfc53d04"
+    }
+  ],
+  "members": [
+    {
+      "path": "runtime.js",
+      "bytes": 300260,
+      "sha256": "5af6abaf5838a4e8ed7bc883e061560f5c11324f3a5f6f90fd488fbb06fb482b"
+    },
+    {
+      "path": "LICENSES.txt",
+      "bytes": 3288,
+      "sha256": "21fed045273e053184af7f129c5eccd3d24529b04540c2494c8eb5254d46f331"
+    }
+  ]
+}

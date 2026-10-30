@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: DiscussionBridge/discourse-discussion-bridge
-          ref: 82bb84ac4f59cc411e6e7b9c27d851e8f698c6ac
+          ref: ab6cd8a3da5bb101c5a78b6b9780fa128c1860b2
           path: discourse-plugin
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -72,8 +72,10 @@ jobs:
           package_file=$(node -p "'hugo-discussion-bridge-' + require('./package.json').version + '.tgz'")
           consumer=$(mktemp -d "$RUNNER_TEMP/hugo-package-consumer-XXXXXX")
           npm install --prefix "$consumer" --ignore-scripts --no-audit --no-fund "$PWD/.artifacts/$package_file"
+          node "$consumer/node_modules/hugo-discussion-bridge/scripts/check-package.mjs" "$consumer/node_modules/hugo-discussion-bridge"
           cd "$consumer"
           node --input-type=module -e "const adapter = await import('hugo-discussion-bridge'); const cms = await import('hugo-discussion-bridge/cms'); if (typeof adapter.prepare !== 'function' || typeof cms.runHugoNativeCms !== 'function') throw new Error('Normal package public imports are incomplete');"
+          DISCUSSIONBRIDGE_CONTRACT_TEST_MODULE="$consumer/node_modules/hugo-discussion-bridge/src/protocol-v4" node --test "$GITHUB_WORKSPACE/hugo/test/contract-runtime.test.mjs"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: hugo-discussion-bridge-node-${{ matrix.node }}-${{ github.sha }}

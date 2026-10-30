@@ -1,0 +1,1182 @@
+{
+  "status": "V4 derived author fixtures, not frozen/qualified",
+  "fixtures": [
+    {
+      "id": "connection",
+      "type": "Connection",
+      "value": {
+        "connection_id": "dbc_111111111111111111111111",
+        "profile": "ghost",
+        "destination_origin": "https://publisher.example/",
+        "scope_revision": "scope-r1",
+        "forum_name": "Example Forum",
+        "directions": [
+          "to_discourse",
+          "from_discourse"
+        ],
+        "policy": {
+          "policy_revision": "policy-r1",
+          "enabled": true,
+          "selection": "categories",
+          "category_ids": [
+            "5"
+          ],
+          "include_topic_ids": [],
+          "exclude_topic_ids": [],
+          "include_unlisted": false,
+          "publication_kind": "dynamic",
+          "presentation_mode": "full",
+          "author_ids": [],
+          "taxonomy_ids": []
+        },
+        "publication_lane": "default",
+        "native_capabilities": {
+          "native_revision": "capability-r1",
+          "supported_presentations": [
+            "simple",
+            "full",
+            "interactive"
+          ],
+          "publication_kind": "dynamic",
+          "complete_content_supported": true
+        }
+      }
+    },
+    {
+      "id": "to_resolve",
+      "type": "ToResolve",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000010",
+        "bridge_record": {
+          "direction": "to_discourse",
+          "external_id": "page:site-7:roadmap",
+          "canonical_url": "https://publisher.example/roadmap/",
+          "title": "Roadmap",
+          "content_html": "<p>A deterministic source revision.</p>",
+          "published": true,
+          "source_revision": "native-source-r1",
+          "expected_source_revision": null,
+          "source_created_at": "2026-10-01T12:00:00.000Z",
+          "source_updated_at": "2026-10-09T17:58:00.000Z",
+          "representation": {
+            "kind": "full"
+          },
+          "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "source_content_bytes": 39
+        }
+      }
+    },
+    {
+      "id": "resolve_created",
+      "type": "ResolveResult",
+      "value": {
+        "outcome": "created",
+        "reason": "record_created",
+        "resource_id": "11111111-1111-4111-8111-000000000002",
+        "topic_id": "8",
+        "topic_url": "https://forum.example/t/roadmap/8",
+        "direction": "to_discourse",
+        "source_revision": "native-source-r1",
+        "synchronized_at": "2026-10-09T18:00:00.000Z",
+        "core_fallback": false
+      }
+    },
+    {
+      "id": "record",
+      "type": "Record",
+      "value": {
+        "resource_id": "11111111-1111-4111-8111-000000000002",
+        "direction": "to_discourse",
+        "state": "active",
+        "topic_id": "8",
+        "topic_url": "https://forum.example/t/roadmap/8",
+        "external_id": "page:site-7:roadmap",
+        "canonical_url": "https://publisher.example/roadmap/",
+        "source_revision": "source-r1",
+        "source_created_at": "2026-10-01T12:00:00.000Z",
+        "source_updated_at": "2026-10-09T17:58:00.000Z",
+        "synchronized_at": "2026-10-09T18:00:00.000Z",
+        "mapping_id": null
+      }
+    },
+    {
+      "id": "record_page",
+      "type": "RecordPage",
+      "value": {
+        "items": [
+          {
+            "resource_id": "11111111-1111-4111-8111-000000000002",
+            "direction": "to_discourse",
+            "state": "active",
+            "topic_id": "8",
+            "topic_url": "https://forum.example/t/roadmap/8",
+            "external_id": "page:site-7:roadmap",
+            "canonical_url": "https://publisher.example/roadmap/",
+            "source_revision": "source-r1",
+            "source_created_at": "2026-10-01T12:00:00.000Z",
+            "source_updated_at": "2026-10-09T17:58:00.000Z",
+            "synchronized_at": "2026-10-09T18:00:00.000Z",
+            "mapping_id": null
+          }
+        ],
+        "next_cursor": null
+      }
+    },
+    {
+      "id": "withdraw_record",
+      "type": "WithdrawInput",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000011",
+        "expected_source_revision": "source-r1",
+        "reason": "source_unpublished"
+      }
+    },
+    {
+      "id": "initial_feed",
+      "type": "SourceFeed",
+      "value": {
+        "stream": "initial",
+        "items": [
+          {
+            "event_type": "publication",
+            "event_id": "11111111-1111-4111-8111-000000000005",
+            "event_sequence": "101",
+            "source": {
+              "source_id": "topic:8",
+              "source_revision": "source-r1",
+              "topic_id": "8",
+              "topic_url": "https://forum.example/t/roadmap/8",
+              "title": "Roadmap",
+              "content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+              "content_bytes": 39,
+              "source_created_at": "2026-10-01T12:00:00.000Z",
+              "source_updated_at": "2026-10-09T17:58:00.000Z",
+              "source_authors": [
+                {
+                  "id": "user:8",
+                  "name": "Example Author"
+                }
+              ]
+            }
+          }
+        ],
+        "next_cursor": null,
+        "checkpoint_cursor": "ZXhhbXBsZS1jaGVja3BvaW50"
+      }
+    },
+    {
+      "id": "changes_feed",
+      "type": "SourceFeed",
+      "value": {
+        "stream": "changes",
+        "items": [
+          {
+            "event_type": "revocation",
+            "event_id": "11111111-1111-4111-8111-000000000006",
+            "event_sequence": "102",
+            "source_id": "topic:8",
+            "last_source_revision": "source-r1",
+            "reason": "source_unpublished"
+          }
+        ],
+        "next_cursor": null,
+        "checkpoint_cursor": "ZXhhbXBsZS1jaGVja3BvaW50LTI"
+      }
+    },
+    {
+      "id": "content_chunk",
+      "type": "ContentChunk",
+      "value": {
+        "source_id": "topic:8",
+        "source_revision": "source-r1",
+        "content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+        "content_bytes": 39,
+        "offset": 0,
+        "next_offset": null,
+        "content_base64": "PHA+QSBkZXRlcm1pbmlzdGljIHNvdXJjZSByZXZpc2lvbi48L3A+"
+      }
+    },
+    {
+      "id": "policy",
+      "type": "Policy",
+      "value": {
+        "policy_revision": "policy-r1",
+        "enabled": true,
+        "selection": "categories",
+        "category_ids": [
+          "5"
+        ],
+        "include_topic_ids": [],
+        "exclude_topic_ids": [],
+        "include_unlisted": false,
+        "publication_kind": "dynamic",
+        "presentation_mode": "full",
+        "author_ids": [],
+        "taxonomy_ids": []
+      }
+    },
+    {
+      "id": "mapping",
+      "type": "Mapping",
+      "value": {
+        "mapping_id": "11111111-1111-4111-8111-000000000001",
+        "resource_id": "11111111-1111-4111-8111-000000000002",
+        "connection_id": "dbc_111111111111111111111111",
+        "source_id": "topic:8",
+        "external_id": "page:site-7:roadmap",
+        "mapping_revision": "mapping-r1",
+        "destination_native_id": "native:7",
+        "canonical_url": "https://publisher.example/roadmap/",
+        "retired_url_count": 0,
+        "mapping_state": "pending",
+        "presentation_mode": "full",
+        "desired_source_revision": "source-r1",
+        "synchronized_source_revision": null,
+        "publicly_verified_source_revision": null,
+        "destination_native_revision": null,
+        "source_created_at": "2026-10-01T12:00:00.000Z",
+        "source_updated_at": "2026-10-09T17:58:00.000Z",
+        "synchronized_at": null,
+        "publicly_verified_at": null
+      }
+    },
+    {
+      "id": "mapping_page",
+      "type": "MappingPage",
+      "value": {
+        "items": [
+          {
+            "mapping_id": "11111111-1111-4111-8111-000000000001",
+            "resource_id": "11111111-1111-4111-8111-000000000002",
+            "connection_id": "dbc_111111111111111111111111",
+            "source_id": "topic:8",
+            "external_id": "page:site-7:roadmap",
+            "mapping_revision": "mapping-r1",
+            "destination_native_id": "native:7",
+            "canonical_url": "https://publisher.example/roadmap/",
+            "retired_url_count": 0,
+            "mapping_state": "pending",
+            "presentation_mode": "full",
+            "desired_source_revision": "source-r1",
+            "synchronized_source_revision": null,
+            "publicly_verified_source_revision": null,
+            "destination_native_revision": null,
+            "source_created_at": "2026-10-01T12:00:00.000Z",
+            "source_updated_at": "2026-10-09T17:58:00.000Z",
+            "synchronized_at": null,
+            "publicly_verified_at": null
+          }
+        ],
+        "next_cursor": null
+      }
+    },
+    {
+      "id": "mapping_prepare",
+      "type": "MappingPrepare",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000012",
+        "source_id": "topic:8",
+        "source_revision": "source-r1",
+        "policy_revision": "policy-r1",
+        "external_id": "page:site-7:roadmap",
+        "canonical_url": "https://publisher.example/roadmap/"
+      }
+    },
+    {
+      "id": "claim",
+      "type": "Claim",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000014"
+      }
+    },
+    {
+      "id": "lease",
+      "type": "Lease",
+      "value": {
+        "work": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "mapping_id": "11111111-1111-4111-8111-000000000001",
+          "source_id": "topic:8",
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1",
+          "action": "publish_revision",
+          "state": "leased",
+          "attempt_cycle": "11111111-1111-4111-8111-000000000004",
+          "attempt": 1,
+          "lease_generation": 1,
+          "retry_at": null,
+          "last_failure_code": null
+        },
+        "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "lease_generation": 1,
+        "expires_at": "2026-10-09T18:05:00.000Z",
+        "server_time": "2026-10-09T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "work_status",
+      "type": "WorkQueryResponse",
+      "value": {
+        "work": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "mapping_id": "11111111-1111-4111-8111-000000000001",
+          "source_id": "topic:8",
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1",
+          "action": "publish_revision",
+          "state": "leased",
+          "attempt_cycle": "11111111-1111-4111-8111-000000000004",
+          "attempt": 1,
+          "lease_generation": 1,
+          "retry_at": null,
+          "last_failure_code": null
+        },
+        "mapping": {
+          "mapping_id": "11111111-1111-4111-8111-000000000001",
+          "resource_id": "11111111-1111-4111-8111-000000000002",
+          "connection_id": "dbc_111111111111111111111111",
+          "source_id": "topic:8",
+          "external_id": "page:site-7:roadmap",
+          "mapping_revision": "mapping-r1",
+          "destination_native_id": "native:7",
+          "canonical_url": "https://publisher.example/roadmap/",
+          "retired_url_count": 0,
+          "mapping_state": "pending",
+          "presentation_mode": "full",
+          "desired_source_revision": "source-r1",
+          "synchronized_source_revision": null,
+          "publicly_verified_source_revision": null,
+          "destination_native_revision": null,
+          "source_created_at": "2026-10-01T12:00:00.000Z",
+          "source_updated_at": "2026-10-09T17:58:00.000Z",
+          "synchronized_at": null,
+          "publicly_verified_at": null
+        },
+        "lease_expires_at": "2026-10-09T18:05:00.000Z"
+      }
+    },
+    {
+      "id": "renew",
+      "type": "Renew",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000015",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        }
+      }
+    },
+    {
+      "id": "sync_ack",
+      "type": "Ack",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000016",
+        "stage": "synchronized",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "native_result": {
+          "kind": "publish_revision",
+          "native_id": "native:7",
+          "external_id": "page:site-7:roadmap",
+          "canonical_url": "https://publisher.example/roadmap/",
+          "native_revision": "native-r1",
+          "ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "representation": {
+            "kind": "full",
+            "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa"
+          }
+        }
+      }
+    },
+    {
+      "id": "deploy_ack",
+      "type": "Ack",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000017",
+        "stage": "deployed",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "deployment_id": "deploy:1",
+        "deployed_at": "2026-10-09T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "verify_ack",
+      "type": "Ack",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000018",
+        "stage": "verified",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "verification": {
+          "kind": "published",
+          "url": "https://publisher.example/roadmap/",
+          "native_id": "native:7",
+          "source_revision": "source-r1",
+          "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "native_publication_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "verification_profile": "example-owned-html-v1",
+          "checked_at": "2026-10-09T18:00:00.000Z",
+          "representation": {
+            "kind": "full",
+            "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa"
+          }
+        }
+      }
+    },
+    {
+      "id": "failure",
+      "type": "Failure",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000019",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "code": "native_service_unavailable",
+        "native_change_applied": false,
+        "safe_detail": "Native service temporarily unavailable",
+        "retry_after_seconds": 60
+      }
+    },
+    {
+      "id": "static_prepare",
+      "type": "StaticPreparation",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000020",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "transaction_id": "11111111-1111-4111-8111-000000000007",
+        "native_result": {
+          "kind": "publish_revision",
+          "native_id": "native:7",
+          "external_id": "page:site-7:roadmap",
+          "canonical_url": "https://publisher.example/roadmap/",
+          "native_revision": "native-r1",
+          "ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "representation": {
+            "kind": "full",
+            "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa"
+          }
+        },
+        "prepared_at": "2026-10-09T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "static_finalize",
+      "type": "StaticFinalize",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000021",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "transaction_id": "11111111-1111-4111-8111-000000000007",
+        "deployment_id": "deploy:1",
+        "deployed_at": "2026-10-09T18:00:00.000Z",
+        "verification": {
+          "kind": "published",
+          "url": "https://publisher.example/roadmap/",
+          "native_id": "native:7",
+          "source_revision": "source-r1",
+          "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "native_publication_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "verification_profile": "example-owned-html-v1",
+          "checked_at": "2026-10-09T18:00:00.000Z",
+          "representation": {
+            "kind": "full",
+            "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa"
+          }
+        }
+      }
+    },
+    {
+      "id": "static_abort",
+      "type": "StaticAbort",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000022",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "transaction_id": "11111111-1111-4111-8111-000000000007",
+        "native_restored": true,
+        "safe_detail": "Prior native revision restored"
+      }
+    },
+    {
+      "id": "url_move_prepare",
+      "type": "UrlMovePrepare",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000023",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "expected_mapping_revision": "mapping-r1",
+        "old_url": "https://publisher.example/roadmap/",
+        "new_url": "https://publisher.example/new-roadmap/",
+        "ownership": {
+          "resource_id": "11111111-1111-4111-8111-000000000002",
+          "external_id": "page:site-7:roadmap",
+          "native_id": "native:7",
+          "canonical_url": "https://publisher.example/roadmap/",
+          "source_revision": "source-r1",
+          "ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "id": "url_move",
+      "type": "UrlMove",
+      "value": {
+        "move_id": "11111111-1111-4111-8111-000000000008",
+        "mapping_id": "11111111-1111-4111-8111-000000000001",
+        "expected_mapping_revision": "mapping-r1",
+        "old_url": "https://publisher.example/roadmap/",
+        "new_url": "https://publisher.example/new-roadmap/",
+        "proof_nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "state": "prepared",
+        "prepared_at": "2026-10-09T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "url_move_finalize",
+      "type": "UrlMoveFinalize",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000024",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "move_id": "11111111-1111-4111-8111-000000000008",
+        "proof_nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "ownership": {
+          "resource_id": "11111111-1111-4111-8111-000000000002",
+          "external_id": "page:site-7:roadmap",
+          "native_id": "native:7",
+          "canonical_url": "https://publisher.example/new-roadmap/",
+          "source_revision": "source-r1",
+          "ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "verification": {
+          "kind": "published",
+          "url": "https://publisher.example/new-roadmap/",
+          "native_id": "native:7",
+          "source_revision": "source-r1",
+          "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "native_publication_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "verification_profile": "example-owned-html-v1",
+          "checked_at": "2026-10-09T18:00:00.000Z",
+          "representation": {
+            "kind": "full",
+            "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa"
+          }
+        }
+      }
+    },
+    {
+      "id": "url_move_abort",
+      "type": "UrlMoveAbort",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000025",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": "source-r1",
+          "policy_revision": "policy-r1"
+        },
+        "move_id": "11111111-1111-4111-8111-000000000008",
+        "native_change_applied": false,
+        "ownership": {
+          "resource_id": "11111111-1111-4111-8111-000000000002",
+          "external_id": "page:site-7:roadmap",
+          "native_id": "native:7",
+          "canonical_url": "https://publisher.example/roadmap/",
+          "source_revision": "source-r1",
+          "ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "id": "url_history",
+      "type": "UrlHistoryPage",
+      "value": {
+        "items": [
+          {
+            "url": "https://publisher.example/roadmap/",
+            "retired_at": "2026-10-09T18:00:00.000Z",
+            "move_id": "11111111-1111-4111-8111-000000000008"
+          }
+        ],
+        "next_cursor": null
+      }
+    },
+    {
+      "id": "catalog_begin",
+      "type": "CatalogBegin",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000026",
+        "kind": "authors",
+        "native_revision": "catalog-native-r1",
+        "total_items": 1
+      }
+    },
+    {
+      "id": "catalog_upload",
+      "type": "CatalogUpload",
+      "value": {
+        "upload_id": "11111111-1111-4111-8111-000000000009",
+        "kind": "authors",
+        "native_revision": "catalog-native-r1",
+        "total_items": 1,
+        "received_items": 0,
+        "next_page": 0,
+        "expires_at": "2026-10-10T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "catalog_page",
+      "type": "CatalogPageInput",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000027",
+        "page": 0,
+        "items": [
+          {
+            "id": "author:8",
+            "label": "Example Author",
+            "available": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "catalog_finalize",
+      "type": "CatalogFinalize",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000028",
+        "upload_id": "11111111-1111-4111-8111-000000000009",
+        "expected_total_items": 1
+      }
+    },
+    {
+      "id": "catalog_response",
+      "type": "CatalogResponse",
+      "value": {
+        "kind": "authors",
+        "catalog_revision": "catalog-r1",
+        "native_revision": "catalog-native-r1",
+        "total_items": 1,
+        "items": [
+          {
+            "id": "author:8",
+            "label": "Example Author",
+            "available": true
+          }
+        ],
+        "next_cursor": null
+      }
+    },
+    {
+      "id": "source_url_move_prepare",
+      "type": "SourceUrlMovePrepare",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000029",
+        "expected_source_revision": "source-r1",
+        "old_url": "https://publisher.example/roadmap/",
+        "new_url": "https://publisher.example/new-roadmap/",
+        "external_id": "page:site-7:roadmap"
+      }
+    },
+    {
+      "id": "source_url_move",
+      "type": "SourceUrlMove",
+      "value": {
+        "move_id": "11111111-1111-4111-8111-000000000008",
+        "resource_id": "11111111-1111-4111-8111-000000000002",
+        "expected_source_revision": "source-r1",
+        "old_url": "https://publisher.example/roadmap/",
+        "new_url": "https://publisher.example/new-roadmap/",
+        "proof_nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "state": "prepared",
+        "prepared_at": "2026-10-09T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "source_url_move_finalize",
+      "type": "SourceUrlMoveFinalize",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000030",
+        "move_id": "11111111-1111-4111-8111-000000000008",
+        "proof_nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_source_revision": "source-r1",
+        "verification": {
+          "url": "https://publisher.example/new-roadmap/",
+          "external_id": "page:site-7:roadmap",
+          "source_revision": "source-url-r2",
+          "source_content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "native_ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "native_publication_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+          "verification_profile": "example-owned-html-v1",
+          "checked_at": "2026-10-09T18:00:00.000Z"
+        },
+        "new_source_revision": "source-url-r2",
+        "source_updated_at": "2026-10-09T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "source_url_move_abort",
+      "type": "SourceUrlMoveAbort",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000031",
+        "move_id": "11111111-1111-4111-8111-000000000008",
+        "expected_source_revision": "source-r1",
+        "native_change_applied": false,
+        "old_url": "https://publisher.example/roadmap/",
+        "native_ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "native_ownership_receipt",
+      "type": "NativeOwnershipReceipt",
+      "value": {
+        "schema_version": "db-native-ownership-1",
+        "forum_origin": "https://forum.example/",
+        "connection_id": "dbc_111111111111111111111111",
+        "mapping_id": "11111111-1111-4111-8111-000000000001",
+        "resource_id": "11111111-1111-4111-8111-000000000002",
+        "source_id": "topic:8",
+        "external_id": "page:site-7:roadmap",
+        "native_id": "native:7",
+        "canonical_url": "https://publisher.example/roadmap/",
+        "source_revision": "source-r1",
+        "last_lease_generation": 1,
+        "move_id": null,
+        "proof_nonce": null
+      }
+    },
+    {
+      "id": "error",
+      "type": "Error",
+      "value": {
+        "outcome": "rejected",
+        "code": "revision_conflict",
+        "retryable": false,
+        "retry_after_seconds": null,
+        "correlation_id": null,
+        "core_fallback": false
+      }
+    },
+    {
+      "id": "static_withdraw_prepare",
+      "type": "StaticPreparation",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000032",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": null,
+          "policy_revision": "policy-r1"
+        },
+        "transaction_id": "11111111-1111-4111-8111-000000000007",
+        "native_result": {
+          "kind": "withdraw",
+          "native_id": "native:7",
+          "external_id": "page:site-7:roadmap",
+          "canonical_url": "https://publisher.example/roadmap/",
+          "native_revision": "native-r2",
+          "ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "prepared_at": "2026-10-09T18:00:00.000Z"
+      }
+    },
+    {
+      "id": "static_withdraw_finalize",
+      "type": "StaticFinalize",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000033",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": null,
+          "policy_revision": "policy-r1"
+        },
+        "transaction_id": "11111111-1111-4111-8111-000000000007",
+        "deployment_id": "deploy:2",
+        "deployed_at": "2026-10-09T18:00:00.000Z",
+        "verification": {
+          "kind": "absent",
+          "url": "https://publisher.example/roadmap/",
+          "native_id": "native:7",
+          "checked_at": "2026-10-09T18:00:00.000Z",
+          "http_status": 404
+        }
+      }
+    },
+    {
+      "id": "dynamic_withdraw_sync",
+      "type": "Ack",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000034",
+        "stage": "synchronized",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": null,
+          "policy_revision": "policy-r1"
+        },
+        "native_result": {
+          "kind": "withdraw",
+          "native_id": "native:7",
+          "external_id": "page:site-7:roadmap",
+          "canonical_url": "https://publisher.example/roadmap/",
+          "native_revision": "native-r2",
+          "ownership_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "id": "dynamic_withdraw_verified",
+      "type": "Ack",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000035",
+        "stage": "verified",
+        "authority": {
+          "work_id": "11111111-1111-4111-8111-000000000003",
+          "lease_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "lease_generation": 1,
+          "source_revision": null,
+          "policy_revision": "policy-r1"
+        },
+        "verification": {
+          "kind": "absent",
+          "url": "https://publisher.example/roadmap/",
+          "native_id": "native:7",
+          "checked_at": "2026-10-09T18:00:00.000Z",
+          "http_status": 404
+        }
+      }
+    },
+    {
+      "id": "wire_CursorQuery",
+      "type": "CursorQuery",
+      "value": {}
+    },
+    {
+      "id": "wire_SourceFeedQuery",
+      "type": "SourceFeedQuery",
+      "value": {
+        "stream": "initial"
+      }
+    },
+    {
+      "id": "wire_ContentQuery",
+      "type": "ContentQuery",
+      "value": {}
+    },
+    {
+      "id": "wire_CatalogReadQuery",
+      "type": "CatalogReadQuery",
+      "value": {
+        "kind": "authors"
+      }
+    },
+    {
+      "id": "attention_capability",
+      "type": "AttentionRecoveryCapability",
+      "value": {
+        "protocol_revision": "attention-recovery-1",
+        "candidate_id": "discussionbridge-v4-core-20261025-r6",
+        "inspection_profiles": [
+          "astro-static-1"
+        ]
+      }
+    },
+    {
+      "id": "attention_query",
+      "type": "AttentionFeedQuery",
+      "value": {}
+    },
+    {
+      "id": "attention_inspections",
+      "type": "AttentionInspectionPage",
+      "value": {
+        "items": [
+          {
+            "sequence": 1,
+            "inspection_id": "11111111-1111-4111-8111-000000000901",
+            "context_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "work": {
+              "work_id": "11111111-1111-4111-8111-000000000003",
+              "mapping_id": "11111111-1111-4111-8111-000000000001",
+              "source_id": "topic:8",
+              "source_revision": "source-r1",
+              "policy_revision": "policy-r1",
+              "action": "publish_revision",
+              "state": "attention",
+              "attempt_cycle": "11111111-1111-4111-8111-000000000004",
+              "attempt": 1,
+              "lease_generation": 1,
+              "retry_at": null,
+              "last_failure_code": "native_service_unavailable"
+            },
+            "mapping": {
+              "mapping_id": "11111111-1111-4111-8111-000000000001",
+              "resource_id": "11111111-1111-4111-8111-000000000002",
+              "connection_id": "dbc_111111111111111111111111",
+              "source_id": "topic:8",
+              "external_id": "page:site-7:roadmap",
+              "mapping_revision": "mapping-r1",
+              "destination_native_id": "native:7",
+              "canonical_url": "https://publisher.example/roadmap/",
+              "retired_url_count": 0,
+              "mapping_state": "pending",
+              "presentation_mode": "full",
+              "desired_source_revision": "source-r1",
+              "synchronized_source_revision": null,
+              "publicly_verified_source_revision": null,
+              "destination_native_revision": null,
+              "source_created_at": "2026-10-01T12:00:00.000Z",
+              "source_updated_at": "2026-10-09T17:58:00.000Z",
+              "synchronized_at": null,
+              "publicly_verified_at": null
+            },
+            "source": {
+              "source_id": "topic:8",
+              "source_revision": "source-r1",
+              "topic_id": "8",
+              "topic_url": "https://forum.example/t/roadmap/8",
+              "title": "Roadmap",
+              "content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+              "content_bytes": 39,
+              "source_created_at": "2026-10-01T12:00:00.000Z",
+              "source_updated_at": "2026-10-09T17:58:00.000Z",
+              "source_authors": [
+                {
+                  "id": "user:8",
+                  "name": "Example Author"
+                }
+              ]
+            },
+            "native_result": null,
+            "verified_native_result": null,
+            "verification": null,
+            "prepared_transaction": null,
+            "created_at": "2026-10-25T20:00:00.000Z"
+          }
+        ],
+        "next_after": 1,
+        "has_more": false
+      }
+    },
+    {
+      "id": "attention_report",
+      "type": "AttentionInspectionReport",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000905",
+        "context_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observation": {
+          "profile": "astro-static-1",
+          "observed_at": "2026-10-25T20:01:00.000Z",
+          "native_state": "unknown",
+          "object_exists": null,
+          "native_id": null,
+          "native_revision": null,
+          "ownership": null,
+          "native_result": null,
+          "verification": null,
+          "source_revision": null,
+          "managed_content_sha256": null,
+          "native_command": "none",
+          "pending_mutation": "none",
+          "prepared_transaction_id": null,
+          "journal_sha256": null,
+          "baseline_sha256": null,
+          "candidate_sha256": null,
+          "current_sha256": null,
+          "restoration_operation_id": null,
+          "issue": "baseline_missing"
+        }
+      }
+    },
+    {
+      "id": "attention_result",
+      "type": "AttentionInspectionResult",
+      "value": {
+        "inspection_id": "11111111-1111-4111-8111-000000000901",
+        "context_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "not_ready",
+        "issue": "baseline_missing",
+        "observed_at": "2026-10-25T20:01:00.000Z"
+      }
+    },
+    {
+      "id": "attention_recoveries",
+      "type": "AttentionRecoveryPage",
+      "value": {
+        "items": [
+          {
+            "sequence": 1,
+            "recovery_id": "11111111-1111-4111-8111-000000000904",
+            "inspection_id": "11111111-1111-4111-8111-000000000901",
+            "context_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "predecessor_work_id": "11111111-1111-4111-8111-000000000003",
+            "predecessor_attempt_cycle": "11111111-1111-4111-8111-000000000004",
+            "work": {
+              "work_id": "11111111-1111-4111-8111-000000000902",
+              "mapping_id": "11111111-1111-4111-8111-000000000001",
+              "source_id": "topic:8",
+              "source_revision": "source-r1",
+              "policy_revision": "policy-r1",
+              "action": "publish_revision",
+              "state": "pending",
+              "attempt_cycle": "11111111-1111-4111-8111-000000000903",
+              "attempt": 0,
+              "lease_generation": 1,
+              "retry_at": null,
+              "last_failure_code": null
+            },
+            "mapping": {
+              "mapping_id": "11111111-1111-4111-8111-000000000001",
+              "resource_id": "11111111-1111-4111-8111-000000000002",
+              "connection_id": "dbc_111111111111111111111111",
+              "source_id": "topic:8",
+              "external_id": "page:site-7:roadmap",
+              "mapping_revision": "mapping-r1",
+              "destination_native_id": "native:7",
+              "canonical_url": "https://publisher.example/roadmap/",
+              "retired_url_count": 0,
+              "mapping_state": "pending",
+              "presentation_mode": "full",
+              "desired_source_revision": "source-r1",
+              "synchronized_source_revision": null,
+              "publicly_verified_source_revision": null,
+              "destination_native_revision": null,
+              "source_created_at": "2026-10-01T12:00:00.000Z",
+              "source_updated_at": "2026-10-09T17:58:00.000Z",
+              "synchronized_at": null,
+              "publicly_verified_at": null
+            },
+            "source": {
+              "source_id": "topic:8",
+              "source_revision": "source-r1",
+              "topic_id": "8",
+              "topic_url": "https://forum.example/t/roadmap/8",
+              "title": "Roadmap",
+              "content_sha256": "05cdd1137e7eda4c7c0f67a5a744c1351139d7faa3c6e52b407b214f3136b8aa",
+              "content_bytes": 39,
+              "source_created_at": "2026-10-01T12:00:00.000Z",
+              "source_updated_at": "2026-10-09T17:58:00.000Z",
+              "source_authors": [
+                {
+                  "id": "user:8",
+                  "name": "Example Author"
+                }
+              ]
+            },
+            "mode": "retry",
+            "native_baseline": null,
+            "verification": null,
+            "created_at": "2026-10-25T20:02:00.000Z"
+          }
+        ],
+        "next_after": 1,
+        "has_more": false
+      }
+    },
+    {
+      "id": "attention_claim",
+      "type": "AttentionRecoveryClaim",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000906",
+        "work_id": "11111111-1111-4111-8111-000000000902"
+      }
+    },
+    {
+      "id": "attention_admin_check",
+      "type": "AttentionAdminCheck",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000907",
+        "selected": [
+          {
+            "work_id": "11111111-1111-4111-8111-000000000003",
+            "mapping_revision": "mapping-r1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "attention_admin_retry",
+      "type": "AttentionAdminRetry",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000908",
+        "selected": [
+          {
+            "inspection_id": "11111111-1111-4111-8111-000000000901",
+            "context_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "settle_restored_baseline": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "attention_admin_result",
+      "type": "AttentionAdminResult",
+      "value": {
+        "mutation_id": "11111111-1111-4111-8111-000000000907",
+        "items": [
+          {
+            "work_id": "11111111-1111-4111-8111-000000000003",
+            "inspection_id": "11111111-1111-4111-8111-000000000901",
+            "recovery_id": null,
+            "successor_work_id": null,
+            "status": "waiting",
+            "issue": "none"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # Hugo DiscussionBridge V4
 
 Unpublished development **0.4.0-alpha.1**, wire **v4**, candidate
-`discussionbridge-v4-core-20261025-r6`, release version `null`. The additive
+`discussionbridge-v4-core-20261029-r7`, release version `null`. The additive
 attention-recovery-1 capability is probed before its new routes are used;
 existing V4-01..31 shapes stay unchanged. Explicit V4 private journal and source
 creation provenance remains intact, including known r5 records; no old wire
@@ -10,7 +10,9 @@ release or formal review qualification is claimed.
 
 ## Development checks
 
-Run `npm ci`, `npm test` and `npm run build` from this checkout. The complete
+Run `npm ci`, `npm run build` and `npm test` from this checkout. The complete
+adapter requires Node **22.12 or newer**, matching its sanitizer's existing
+runtime requirement. No operator runtime is upgraded by package tooling. The
 test entry point requires the native `hugo` executable on PATH (CI uses the
 already-tested extended 0.165.0 release) and Ruby for one shared-plugin
 evaluator fixture. Set `DISCUSSIONBRIDGE_RUBY_BINARY` if Ruby is not on PATH.
@@ -19,6 +21,37 @@ by default the fixture uses a sibling `discourse-plugin` directory. CI checks
 out that peer at an explicit commit. The evaluator fixture does not run
 Discourse, Rails or PostgreSQL and does not replace installed integration
 qualification. Its synthetic files/evidence stay in this checkout's `.tmp`.
+
+The normal package contains the exact frozen shared R7 runtime and schema.
+Its URL/IDNA implementation and MIT notices are bundled inside that runtime;
+`src/protocol-v4/idna/` also carries the dependency manifest and full notices.
+Operators do not install a second URL library or rebuild it on their host.
+Maintainers use `node scripts/refresh-contract.mjs /path/to/reviewed/adapter-contract`
+only with shared commit `b90348f9f010ff58fbe52237eda3187c926334ec`.
+The offline refresh checks fixed source and fixture hashes, updates only the
+current runtime descriptor, and leaves historical journal provenance alone.
+It does not migrate state or grant authority to own or move a native page.
+
+Normal browser builds retain local fonts, current package notices and a byte
+ledger in `dist/browser-build-provenance.json`. Rebuilds remove only obsolete
+notices still matching the preceding generated ledger. Unknown files remain;
+modified recorded notices require explicit reconciliation before rebuilding.
+The real-renderer test uses installed Chrome (or the explicit local executable
+in `DISCUSSIONBRIDGE_BROWSER_EXECUTABLE`) in a fresh headless context, without
+an operator's browser profile. It checks real SVG/MathML, hostile content,
+local-only resources and visible unsuccessful-math source.
+
+Because npm deliberately omits `package-lock.json` from installed dependencies,
+the browser build also retains its exact lock bytes as the inert receipt
+`dist/browser-build-lock.json`. This is not an npm-shrinkwrap or a new installation
+rule. `node scripts/check-package.mjs /path/to/installed/hugo-discussion-bridge`
+checks the normal package's pinned SDK, browser inputs/outputs, build receipt and
+complete notice inventory without changing files. Run the same check on a normal
+`npm pack` installation, not just the source checkout.
+
+The common and 1,116 ContextJ fixtures also run against the actual runtime
+extracted by normal package installation. Browser/package fixture evidence is
+not an installed Hugo/Discourse/deployment or whole-suite acceptance claim.
 
 CI runs the complete tests on Node 22 and 24, builds the ordinary browser
 assets, creates the normal `npm pack` artifact, then installs that artifact in
