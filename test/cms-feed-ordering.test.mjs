@@ -38,25 +38,84 @@ async function fixture(t) {
   const client = createCmsClient(cmsConfig, { fetchImpl: async address => {
     const url = new URL(address);
     assert.equal(url.origin, cmsConfig.serverUrl);
-    assert.equal(url.pathname, "/discussion-bridge/v4/sources.json");
     assert.ok(pending.length, "unexpected source request");
-    const { value, cursor } = pending.shift();
-    assert.equal(url.searchParams.get("stream"), value.stream);
+    const { value, cursor = null, stream = value.stream, route = "sources", status = 200 } = pending.shift();
+    assert.equal(url.pathname, `/discussion-bridge/v4/${route}.json`);
+    assert.equal(url.searchParams.get("stream"), stream ?? null);
     assert.equal(url.searchParams.get("cursor"), cursor);
-    return json(value);
+    return json(value, status);
   } });
+  const run = action => withCmsContinuation({ privateRoot, nativeRoot, publicRoots: [publicRoot], client, connection: connection() }, action);
   return {
     async drain(value, cursor = null) {
       pending.push({ value, cursor });
-      return withCmsContinuation({ privateRoot, nativeRoot, publicRoots: [publicRoot], client, connection: connection() },
-        continuation => continuation.drainSources({ maximumPages: 1 }));
+      return run(continuation => continuation.drainSources({ maximumPages: 1 }));
     },
+    async poll(requests, maximumPages = 1) {
+      pending.push(...requests);
+      const result = await run(async continuation => {
+        const result = await continuation.drainSources({ maximumPages });
+        const events = []; for await (const item of continuation.currentEvents()) events.push(item);
+        return { ...result, events };
+      });
+      assert.equal(pending.length, 0, "expected receiver requests were not consumed");
+      return result;
+    },
+    mapping: (sourceId, value) => run(continuation => continuation.mapping(sourceId, value)),
     raw: () => readFile(path.join(privateRoot, "continuation.json"), "utf8"),
     state: async () => JSON.parse(await readFile(path.join(privateRoot, "continuation.json"), "utf8")),
     savedEvent: async index => JSON.parse(await readFile(path.join(privateRoot, "events", `${uuid(index)}.json`), "utf8")),
     current: async sourceId => JSON.parse(await readFile(path.join(privateRoot, "current", `${sha(sourceId)}.json`), "utf8")),
   };
 }
+
+const rejected = code => ({ outcome: "rejected", code, retryable: false, retry_after_seconds: null, correlation_id: uuid(100), core_fallback: false });
+const existingMapping = (source_id = "source-a") => ({
+  mapping_id: uuid(101), resource_id: uuid(102), connection_id: cmsConfig.connectionId, source_id,
+  external_id: "external-a", canonical_url: "https://hugo.example/existing/", mapping_revision: "mapping-1",
+  destination_native_id: "content/existing.md", retired_url_count: 0, mapping_state: "active", presentation_mode: "interactive",
+  desired_source_revision: "revision-10", synchronized_source_revision: "revision-10", publicly_verified_source_revision: "revision-10",
+  destination_native_revision: "native-1", source_created_at: null, source_updated_at: null,
+  synchronized_at: "2026-10-14T12:00:00.000Z", publicly_verified_at: "2026-10-14T12:00:00.000Z",
+});
+
+test("Hugo recovers a validated 410 across runs, preserves owned mapping and replaces only the current source view", async t => {
+  const f = await fixture(t), original = event(1, "10"), mapping = existingMapping();
+  await f.drain(feed("initial", [original], "old"));
+  await f.mapping("source-a", mapping);
+  await f.drain(feed("changes", [event(2, "11", "stale-unmapped")], "old_11"), "old");
+  const first = event(3, "14", "source-b"), second = event(4, "13", "source-c");
+  const stopped = await f.poll([
+    { value: rejected("cursor_expired"), stream: "changes", cursor: "old_11", status: 410 },
+    { value: feed("initial", [first], null, "fresh_2") },
+  ], 2);
+  assert.deepEqual(stopped, { complete: false, pages: 2, events: [] });
+  const recovery = await f.state();
+  assert.equal(recovery.next_cursor, "fresh_2");
+  assert.ok(recovery.recovery_projection);
+  assert.deepEqual(await f.current("source-a"), original);
+  const inventory = { route: "mappings", value: { items: [mapping], next_cursor: null } };
+  await assert.rejects(f.poll([
+    { value: feed("initial", [second], "fresh"), cursor: "fresh_2" },
+    { ...inventory, value: { ...inventory.value, items: [{ ...mapping, canonical_url: "https://hugo.example/other/" }] } },
+  ]), /receiver mapping inventory needs reconciliation/);
+  assert.deepEqual(await f.state(), recovery, "failed reconciliation cannot activate the fresh checkpoint");
+  const finished = await f.poll([{ value: feed("initial", [second], "fresh"), cursor: "fresh_2" }, inventory]);
+  assert.deepEqual(finished.events.map(item => item.source.source_id).sort(), ["source-b", "source-c"]);
+  assert.equal((await f.state()).checkpoint_cursor, "fresh");
+  assert.deepEqual({ ...await f.mapping("source-a") }, mapping, "absence from snapshot is not a withdrawal");
+  assert.deepEqual(await f.savedEvent(1), original);
+  const changed = await f.poll([{ value: feed("changes", [event(5, "15", "source-b")], "fresh_15"), cursor: "fresh" }]);
+  assert.deepEqual(changed.events.map(item => item.event_sequence).sort(), ["13", "15"]);
+});
+
+test("Hugo does not rewind on cursor scope change", async t => {
+  const f = await fixture(t);
+  await f.drain(feed("initial", [event(1, "10")], "old"));
+  const before = await f.raw();
+  await assert.rejects(f.poll([{ value: rejected("cursor_scope_changed"), stream: "changes", cursor: "old", status: 409 }]), { code: "cursor_scope_changed" });
+  assert.equal(await f.raw(), before);
+});
 
 test("actual Hugo continuation accepts descending initial sequences and increasing changes across durable reloads", async t => {
   const f = await fixture(t);

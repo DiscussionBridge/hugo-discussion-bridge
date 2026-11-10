@@ -1,9 +1,9 @@
 import * as currentCodec from "./protocol-v4/cms-runtime.mjs";
 
 export class CmsTransportError extends Error {
-  constructor(code, retryAfterSeconds = null) {
+  constructor(code, retryAfterSeconds = null, receiverResponse = null) {
     super(`Hugo CMS ${code}; native continuation requires attention or an exact retry.`);
-    this.code = code; this.retryAfterSeconds = retryAfterSeconds;
+    this.code = code; this.retryAfterSeconds = retryAfterSeconds; this.receiverResponse = receiverResponse;
   }
 }
 
@@ -71,7 +71,8 @@ export function createCmsClient(config, { fetchImpl = fetch } = {}) {
       if (response.status === 422 && value.outcome === "rejected" && value.retryable === false && value.retry_after_seconds === null
           && (["V4-02", "V4-29"].includes(id) && value.code === "content_preservation_unavailable"
             || id === "V4-02" && value.code === "invalid_field")) throw new CmsReceiverRejection(id, response.status, value);
-      if (!route.success_http.includes(response.status)) throw new CmsTransportError(value.outcome === "reconciliation_required" ? value.reason : value.code, value.retry_after_seconds);
+      if (!route.success_http.includes(response.status)) throw new CmsTransportError(value.outcome === "reconciliation_required" ? value.reason : value.code,
+        value.retry_after_seconds, { routeId: id, status: response.status });
       return { status: response.status, value };
     };
     try { return await Promise.race([operation(), expired]); }

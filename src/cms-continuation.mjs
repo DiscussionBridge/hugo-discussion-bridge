@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, open, opendir, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
+import { CmsTransportError } from "./cms-client.mjs";
 import { assertCmsSafePath, createCmsPrivateDirectory, withCmsNativeLock } from "./cms-journal.mjs";
 import { parseCmsJson, semanticIdentity, validateCms, validateCmsRoute } from "./protocol-v4/cms-runtime.mjs";
 
@@ -27,13 +28,19 @@ export async function withCmsContinuation({ privateRoot, nativeRoot, publicRoots
     let state = old === null ? { schema_version: "db-hugo-cms-continuation-1", binding, stream: "initial", next_cursor: null, checkpoint_cursor: null, last_sequence: null, last_initial_source: null, pending: null, active_lease: null, held_leases: [] }
       : parseCmsJson(old, { maximumBytes: 262144 });
     const stateKeys = ["schema_version", "binding", "stream", "next_cursor", "checkpoint_cursor", "last_sequence", "last_initial_source", "pending", "active_lease", "held_leases"];
-    if (Object.keys(state).length !== stateKeys.length || stateKeys.some((key) => !Object.hasOwn(state, key))) throw new Error("Hugo CMS continuation fields need reconciliation.");
+    const projectionKeys = ["projection", "recovery_projection"];
+    if (Object.keys(state).some((key) => !stateKeys.includes(key) && !projectionKeys.includes(key))
+        || stateKeys.some((key) => !Object.hasOwn(state, key))) throw new Error("Hugo CMS continuation fields need reconciliation.");
     if (state.schema_version !== "db-hugo-cms-continuation-1" || semanticIdentity(state.binding) !== semanticIdentity(binding)
         || !["initial", "changes"].includes(state.stream)) throw new Error("Hugo CMS continuation scope changed; mapping reconciliation is required.");
     for (const key of ["next_cursor", "checkpoint_cursor"]) if (state[key] !== null) validateCms("Cursor", state[key]);
     if (state.last_sequence !== null) validateCms("CoreId", state.last_sequence);
     if (state.last_initial_source !== null) validateCms("OpaqueId", state.last_initial_source);
     if (state.stream === "changes" && state.checkpoint_cursor === null) throw new Error("Hugo CMS change continuation lost its checkpoint; reconciliation is required.");
+    for (const key of projectionKeys) if (Object.hasOwn(state, key)) validateCms("UUID", state[key]);
+    if (state.recovery_projection && (state.stream !== "initial" || state.projection === state.recovery_projection)) {
+      throw new Error("Hugo CMS recovery projection needs reconciliation.");
+    }
     if (!Array.isArray(state.held_leases) || state.held_leases.some((entry) => !entry || typeof entry !== "object" || Object.keys(entry).length !== 3
       || !Object.hasOwn(entry, "lease") || !Object.hasOwn(entry, "issue_name") || !["held", "resumed", "superseded"].includes(entry.state)
       || !/^native\/limitations\/[a-f0-9-]{36}\.json$/u.test(entry.issue_name))) throw new Error("Hugo CMS held local limitation ledger needs reconciliation.");
@@ -57,6 +64,42 @@ export async function withCmsContinuation({ privateRoot, nativeRoot, publicRoots
       } finally { await rm(temp, { force: true }); }
     }
     const save = async () => { const bytes = Buffer.from(JSON.stringify(state) + "\n"); await replace(stateFile, bytes, stateHash); stateHash = sha(bytes); };
+    const projectionDirectory = (generation) => generation === undefined ? path.join(privateRoot, "current") : path.join(privateRoot, "projections", generation);
+    async function* records(directory) {
+      await assertCmsSafePath(directory);
+      let entries; try { entries = await opendir(directory); } catch (error) { if (error.code === "ENOENT") return; throw error; }
+      for await (const entry of entries) {
+        if (!/^[a-f0-9]{64}\.json$/u.test(entry.name) || !entry.isFile() || entry.isSymbolicLink()) throw new Error("Hugo CMS private inventory contains an unexpected entry.");
+        yield [entry.name, parseCmsJson(await regular(path.join(directory, entry.name)), { maximumBytes: 262144 })];
+      }
+    }
+    const reconcileMappings = async (beforePage) => {
+      const pending = new Map();
+      for await (const [file, mapping] of records(path.join(privateRoot, "mappings"))) {
+        validateCms("Mapping", mapping);
+        if (file !== `${sha(mapping.source_id)}.json` || mapping.connection_id !== connection.connection_id || pending.has(mapping.mapping_id)) {
+          throw new Error("Hugo CMS local mapping inventory needs reconciliation.");
+        }
+        pending.set(mapping.mapping_id, mapping);
+      }
+      const cursors = new Set(); let cursor;
+      do {
+        await beforePage();
+        const { value } = await client.request("V4-10", { query: cursor === undefined ? {} : { cursor } });
+        for (const mapping of value.items) {
+          const owned = pending.get(mapping.mapping_id);
+          if (!owned || ["connection_id", "resource_id", "source_id", "external_id", "canonical_url"].some((key) => owned[key] !== mapping[key])
+              || (owned.destination_native_id !== null && owned.destination_native_id !== mapping.destination_native_id)) {
+            throw new Error("Hugo CMS receiver mapping inventory needs reconciliation.");
+          }
+          pending.delete(mapping.mapping_id);
+        }
+        cursor = value.next_cursor;
+        if (cursor !== null && (cursors.has(cursor) || value.items.length === 0)) throw new Error("Hugo CMS mapping inventory did not advance.");
+        cursors.add(cursor);
+      } while (cursor !== null);
+      if (pending.size) throw new Error("Hugo CMS receiver mapping inventory is missing locally owned mappings.");
+    };
     const immutable = async (file, value) => {
       const bytes = Buffer.from(JSON.stringify(value)); const before = await regular(file);
       if (before !== null) {
@@ -119,12 +162,8 @@ export async function withCmsContinuation({ privateRoot, nativeRoot, publicRoots
         return { route: pending.route_id, body, response: await post(pending.route_id, body, pending.path) };
       },
       async *currentEvents() {
-        const directory = path.join(privateRoot, "current"); await assertCmsSafePath(directory);
-        let entries; try { entries = await opendir(directory); } catch (error) { if (error.code === "ENOENT") return; throw error; }
-        for await (const entry of entries) {
-          if (!/^[a-f0-9]{64}\.json$/u.test(entry.name) || !entry.isFile() || entry.isSymbolicLink()) throw new Error("Hugo CMS source census contains an unexpected entry.");
-          const value = parseCmsJson(await regular(path.join(directory, entry.name)), { maximumBytes: 262144 }); validateCms("SourceEvent", value); yield value;
-        }
+        if (state.recovery_projection) return;
+        for await (const [, value] of records(projectionDirectory(state.projection))) { validateCms("SourceEvent", value); yield value; }
       },
       async mapping(sourceId, value) {
         validateCms("OpaqueId", sourceId);
@@ -256,7 +295,19 @@ export async function withCmsContinuation({ privateRoot, nativeRoot, publicRoots
           await beforePage();
           const stream = state.stream, cursor = state.next_cursor ?? (stream === "changes" ? state.checkpoint_cursor : null);
           if (stream === "changes" && cursor === null) throw new Error("Hugo CMS change feed requires its durable checkpoint.");
-          const { value: feed } = await client.request("V4-06", { query: { stream, ...(cursor === null ? {} : { cursor }) } });
+          let feed;
+          try {
+            ({ value: feed } = await client.request("V4-06", { query: { stream, ...(cursor === null ? {} : { cursor }) } }));
+          } catch (error) {
+            if (cursor === null || !(error instanceof CmsTransportError) || error.code !== "cursor_expired"
+                || error.receiverResponse?.routeId !== "V4-06" || error.receiverResponse.status !== 410) throw error;
+            // Keep the old projection and all immutable evidence. A new initial
+            // snapshot becomes visible only after its final page and inventory check.
+            state.recovery_projection = randomUUID();
+            state.stream = "initial"; state.next_cursor = null; state.checkpoint_cursor = null; state.last_initial_source = null;
+            await save();
+            continue;
+          }
           if (feed.stream !== stream || (feed.next_cursor !== null && feed.next_cursor === cursor)) throw new Error("Hugo CMS source continuation did not advance.");
           let lastSequence = state.last_sequence, lastInitial = state.last_initial_source;
           for (const entry of feed.items) {
@@ -268,8 +319,13 @@ export async function withCmsContinuation({ privateRoot, nativeRoot, publicRoots
             await immutable(path.join(privateRoot, "events", `${entry.event_id}.json`), entry);
             if (entry.event_type === "publication") await immutable(path.join(privateRoot, "sources", sha(entry.source.source_id), `${sha(entry.source.source_revision)}.json`), entry.source);
             const sourceId = entry.event_type === "publication" ? entry.source.source_id : entry.source_id;
-            const currentFile = path.join(privateRoot, "current", `${sha(sourceId)}.json`), before = await regular(currentFile);
+            const currentFile = path.join(projectionDirectory(state.recovery_projection ?? state.projection), `${sha(sourceId)}.json`), before = await regular(currentFile);
             await replace(currentFile, Buffer.from(JSON.stringify(entry)), before === null ? null : sha(before));
+          }
+          if (state.recovery_projection && feed.next_cursor === null) {
+            if (feed.checkpoint_cursor === null) throw new Error("Hugo CMS recovery snapshot lacks a change checkpoint.");
+            await reconcileMappings(beforePage);
+            state.projection = state.recovery_projection; delete state.recovery_projection;
           }
           state.last_sequence = lastSequence; state.last_initial_source = lastInitial; state.next_cursor = feed.next_cursor;
           if (feed.checkpoint_cursor !== null) state.checkpoint_cursor = feed.checkpoint_cursor;
