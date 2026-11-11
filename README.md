@@ -1,12 +1,16 @@
-# Hugo DiscussionBridge V4
+# DiscussionBridge for Hugo
 
-Unpublished development **0.4.0-alpha.1**, wire **v4**, candidate
-`discussionbridge-v4-core-20261029-r7`, release version `null`. The additive
-attention-recovery-1 capability is probed before its new routes are used;
-existing V4-01..31 shapes stay unchanged. Explicit V4 private journal and source
-creation provenance remains intact, including known r5 records; no old wire
-selector, silent retagging or legacy initialization is included. No native deployment,
-release or formal review qualification is claimed.
+DiscussionBridge for Hugo connects Hugo content with Discourse topics. The
+adapter prepares publication and discussion data during a trusted Hugo build.
+Its static delivery workflow records the generated result and verifies the
+published page.
+
+**V4 Alpha source:** [`v0.4.0-alpha.1.hugo.4`](https://github.com/DiscussionBridge/hugo-discussion-bridge/tree/v0.4.0-alpha.1.hugo.4) · [GitHub Actions](https://github.com/DiscussionBridge/hugo-discussion-bridge/actions/runs/43107195213)
+
+The adapter uses the [V4 R7 contract](https://github.com/DiscussionBridge/discussionbridge-adapter-contract/tree/09d77c0209835c2d996aad294d161f167c7bd838). Follow the setup and native
+commands below for the site, content directory, and private publication state.
+The adapter probes for the attention recovery capability before using it.
+Existing private journals and source creation records retain their provenance.
 
 ## Development checks
 
@@ -257,9 +261,9 @@ A stale invocation names its original refused UUID; it cannot retry a later
 refusal. An uncertain linked replacement keeps its exact new UUID/request through
 ordinary reconciliation, and another definitive refusal stops again. Normal
 `prepare` does not create these operator actions or retry unchanged refusals.
-Genuinely changed ordinary source editions retain their normal path. To29 and
-From retry rules are unchanged. This recovery source and its focused fixtures
-await execution; it has no inherited native/package/canary qualification.
+Changed source editions use the normal path. To29 and From retry rules are
+unchanged. Verify the recovery path against the site's installed package and
+retained deployment state.
 
 ## Private exact artifacts
 
