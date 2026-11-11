@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,9 +24,10 @@ test("native publication and private all-content census use separate output surf
     await write(root, "hugo.toml", `baseURL="https://native.example/"\n[outputs]\nhome=["HTML","DiscussionBridge"]\n[outputFormats.DiscussionBridge]\nmediaType="application/json"\nbaseName="discussionbridge-manifest"\nisPlainText=true\n[outputFormats.DiscussionBridgeSourceLifecycle]\nmediaType="application/json"\nbaseName="discussionbridge-source-lifecycle"\nisPlainText=true\n[params]\ndiscussionbridge_forum_origin="https://forum.example"\n`);
     await write(root, "layouts/index.html", '{{ range site.RegularPages }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ end }}');
     await write(root, "layouts/_default/single.html", '<html><body>{{ .Content }}</body></html>');
-    for (const relative of ["index.discussionbridge.json", "index.discussionbridgesourcelifecycle.json", "shortcodes/discussionbridge.html", "partials/discussionbridge-credit.html"]) {
+    for (const relative of ["index.discussionbridge.json", "index.discussionbridgesourcelifecycle.json", "shortcodes/discussionbridge.html"]) {
       await mkdir(path.dirname(path.join(root, "layouts", relative)), { recursive: true }); await copyFile(path.join(repository, "layouts", relative), path.join(root, "layouts", relative));
     }
+    await cp(path.join(repository, "layouts", "partials"), path.join(root, "layouts", "partials"), { recursive: true });
     await write(root, "content/visible.md", '+++\ntitle="Visible"\ndate=2026-09-01T10:00:00Z\nlastmod=2026-09-02T11:00:00Z\ndiscussionbridge_mode="to_discourse"\n+++\nActual source é 😀\n');
     await write(root, "content/draft.md", '+++\ntitle="Private draft"\ndraft=true\ndiscussionbridge_mode="to_discourse"\n+++\nSecret draft\n');
     await write(root, "content/future.md", '+++\ntitle="Future"\npublishDate=2030-01-01T00:00:00Z\ndiscussionbridge_mode="to_discourse"\n+++\nFuture body\n');
