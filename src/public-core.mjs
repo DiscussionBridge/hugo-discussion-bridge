@@ -4,6 +4,21 @@ const enc = new TextEncoder();
 const brandingCache = new Map();
 const BRANDING_CACHE_MS = 300000;
 
+export async function retrievePublicAuthor(source, origin, fetchImpl) {
+  const id = source.source_authors[0]?.id;
+  if (!id || !/^[1-9][0-9]*$/u.test(id)) return null;
+  const base = serviceBase(origin);
+  try {
+    const topic = await publicJson(new URL(`/t/${source.topic_id}.json`, base), { serverUrl: base.origin, timeoutMs: 10000, maxResponseBytes: 512 * 1024 }, fetchImpl);
+    const first = topic.post_stream?.posts?.find(post => post?.post_number === 1 &&
+      Number.isSafeInteger(post.topic_id) && String(post.topic_id) === source.topic_id &&
+      Number.isSafeInteger(post.user_id) && String(post.user_id) === id);
+    return typeof first?.username === "string" && /^[a-z0-9_][a-z0-9_.-]*$/iu.test(first.username)
+      ? { id, url: new URL(`/u/${encodeURIComponent(first.username)}`, base).href }
+      : null;
+  } catch { return null; }
+}
+
 export async function retrieveSimple(page, config, fetchImpl) {
   config = { timeoutMs: 15000, maxResponseBytes: 65536, ...config };
   if (!Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 1 || config.timeoutMs > 600000

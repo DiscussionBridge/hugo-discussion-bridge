@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
-import { retrieveSimple } from "./public-core.mjs";
+import { retrievePublicAuthor, retrieveSimple } from "./public-core.mjs";
 import { sanitizePublicationHtml } from "./native-content.mjs";
 import { createCmsClient } from "./cms-client.mjs";
 import { withCmsContinuation } from "./cms-continuation.mjs";
@@ -473,9 +473,11 @@ export async function runHugoNativeCms({ native, connectionConfig, cmsFetch = fe
                   const content = rendered.html;
                   const simple = connection.policy.presentation_mode === "simple" ? await retrieveSimple({ key: identity.slug, topic_id: source.topic_id },
                     { serverUrl: client.origin, timeoutMs: 15000, maxResponseBytes: Math.min(Number.MAX_SAFE_INTEGER, source.content_bytes * 6 + 2 * 1024 * 1024) }, publicFetch) : null;
+                  const authorProfile = await retrievePublicAuthor(source, client.origin, publicFetch);
                   const record = { resource_id: mapping.resource_id, topic_id: source.topic_id, topic_url: source.topic_url, forum_origin: client.origin, forum_name: connection.forum_name,
                     title: source.title, content_html: content, source_revision: source.source_revision, source_authors: source.source_authors,
                     source_created_at: source.source_created_at, source_updated_at: source.source_updated_at, presentation_mode: connection.policy.presentation_mode,
+                    ...(authorProfile ? { source_author_profile: authorProfile } : {}),
                     ...(simple ? { simple_html: simple.simple_html } : {}), cms_verification: { mapping_id: mapping.mapping_id, native_id: identity.nativeId,
                       ...(receipt.move_id === null ? {} : { move_id: receipt.move_id, proof_nonce: receipt.proof_nonce }) } };
                   if ([connectionConfig.connectionSecret, lease.lease_token].some((secret) => JSON.stringify(record).includes(secret))) throw fail("metadata_unavailable");

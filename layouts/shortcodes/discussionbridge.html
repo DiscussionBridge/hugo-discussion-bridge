@@ -57,10 +57,10 @@
         {{ with $.Page.Params.discussionbridge_resource_id }}{{ if ne . $record.resource_id }}{{ errorf "DiscussionBridge prepared resource does not match the native page" }}{{ end }}{{ end }}
         <article class="discussionbridge-from">{{ .content_html | safeHTML }}</article>
         <aside class="discussionbridge-publication">
-          <p>Published from <a href="{{ .topic_url }}">{{ .forum_name }}</a>.</p>
-          {{ with $.Page.Params.discussionbridge_source_author }}
-            <p>Source author: {{ . }}{{ with $.Page.Params.discussionbridge_source_revision }} · Revision {{ . }}{{ end }}{{ with $.Page.Params.discussionbridge_adapter_version }} · Hugo {{ hugo.Version }} · DiscussionBridge for Hugo {{ . }}{{ end }}</p>
+          {{ with .source_authors }}
+            <p>Originally authored by {{ range $i, $author := . }}{{ if $i }}, {{ end }}{{ if and $record.source_author_profile (eq $record.source_author_profile.id $author.id) }}<a href="{{ $record.source_author_profile.url }}">{{ $author.name }}</a>{{ else }}{{ $author.name }}{{ end }}{{ end }}</p>
           {{ end }}
+          <p>Originally published as <a href="{{ .topic_url }}">{{ .title }}</a> on {{ .forum_name }}.</p>
         </aside>
       {{ end }}
       {{ if and (eq $mode "from_discourse") (eq $sourceMode "simple") }}
