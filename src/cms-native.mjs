@@ -472,7 +472,7 @@ export async function runHugoNativeCms({ native, connectionConfig, cmsFetch = fe
                   }
                   const content = rendered.html;
                   const simple = connection.policy.presentation_mode === "simple" ? await retrieveSimple({ key: identity.slug, topic_id: source.topic_id },
-                    { serverUrl: client.origin, timeoutMs: 15000, maxResponseBytes: Math.min(Number.MAX_SAFE_INTEGER, source.content_bytes * 6 + 2 * 1024 * 1024) }, publicFetch) : null;
+                    { serverUrl: client.origin, forumName: connection.forum_name, timeoutMs: 15000, maxResponseBytes: Math.min(Number.MAX_SAFE_INTEGER, source.content_bytes * 6 + 2 * 1024 * 1024) }, publicFetch) : null;
                   const authorProfile = await retrievePublicAuthor(source, client.origin, publicFetch);
                   const record = { resource_id: mapping.resource_id, topic_id: source.topic_id, topic_url: source.topic_url, forum_origin: client.origin, forum_name: connection.forum_name,
                     title: source.title, content_html: content, source_revision: source.source_revision, source_authors: source.source_authors,

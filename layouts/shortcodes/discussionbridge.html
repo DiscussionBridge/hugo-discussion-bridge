@@ -6,6 +6,10 @@
 {{- $key := .Page.File.ContentBaseName -}}
 {{- $record := index hugo.Data.discussionbridge $key -}}
 {{- $forum := strings.TrimSuffix "/" site.Params.discussionbridge_forum_origin -}}
+{{- $forumName := site.Params.discussionbridge_forum_name | default "" -}}
+{{- with $record -}}{{- with .forum_name -}}{{- $forumName = . -}}{{- end -}}{{- end -}}
+{{- $forumLabel := "" -}}
+{{- with $forumName -}}{{- $forumLabel = printf "Open in %s" . -}}{{- end -}}
 {{- $richContent := site.Params.discussionbridge_rich_content | default false -}}
 {{- $sourceMode := "interactive" -}}
 {{- if eq $mode "from_discourse" -}}
@@ -27,8 +31,9 @@
         data-discourse-origin="{{ .forum_origin }}"
         data-topic-id="{{ .topic_id }}"
         data-topic-url="{{ .topic_url }}"
+        data-forum-name="{{ $forumName }}"
       >
-        {{ .simple_html | safeHTML }}
+        {{ partial "discussionbridge/simple-snapshot.html" (dict "topicUrl" .topic_url "forumLabel" $forumLabel "html" .simple_html) }}
         <p data-discussionbridge-simple-status hidden>Live comments are temporarily unavailable; showing the most recently published snapshot.</p>
       </div>
       <script src="/discussionbridge/simple.js" defer></script>
@@ -36,7 +41,7 @@
       <p class="discussionbridge-unavailable" role="status">Comments are temporarily unavailable.</p>
     {{ end }}
   {{ else if eq $mode "full" }}
-    <div class="discussionbridge-header"><h2>Discussion</h2></div>
+    <div class="discussionbridge-header"><h2>Discussion</h2>{{ with $record }}{{ with .topic_url }}<a href="{{ . }}" data-discussionbridge-forum-label="{{ $forumLabel }}">Open in forum</a>{{ end }}{{ end }}</div>
     <div id="discourse-comments"></div>
     <script>
       {{ with $record }}
@@ -64,16 +69,16 @@
         </aside>
       {{ end }}
       {{ if and (eq $mode "from_discourse") (eq $sourceMode "simple") }}
-        <div class="discussionbridge-simple" data-discussionbridge-simple-live data-discourse-origin="{{ .forum_origin }}" data-topic-id="{{ .topic_id }}" data-topic-url="{{ .topic_url }}">
-          {{ .simple_html | safeHTML }}
+        <div class="discussionbridge-simple" data-discussionbridge-simple-live data-discourse-origin="{{ .forum_origin }}" data-topic-id="{{ .topic_id }}" data-topic-url="{{ .topic_url }}" data-forum-name="{{ $forumName }}">
+          {{ partial "discussionbridge/simple-snapshot.html" (dict "topicUrl" .topic_url "forumLabel" $forumLabel "html" .simple_html) }}
           <p data-discussionbridge-simple-status hidden>Showing the published comment snapshot while live replies are unavailable.</p>
         </div>
         <script src="/discussionbridge/simple.js" defer></script>
       {{ else }}
-      <div class="discussionbridge-header"><h2>Discussion</h2><a href="{{ .topic_url }}">Open discussion</a></div>
+      <div class="discussionbridge-header"><h2>Discussion</h2><a href="{{ .topic_url }}" data-discussionbridge-forum-label="{{ $forumLabel }}">Open in forum</a></div>
       <div id="discourse-comments"></div>
       <script>
-        window.DiscourseEmbed = { discourseUrl: {{ printf "%s/" .forum_origin }}, topicId: {{ .topic_id }}{{ if or (ne $mode "from_discourse") (eq $sourceMode "interactive") }}, fullApp: true, embedHeight: "800px", dynamicHeight: false, embedMinHeight: "360"{{ if eq $mode "from_discourse" }}, className: "discussion-bridge-source-presentation"{{ end }}{{ end }} };
+        window.DiscourseEmbed = { discourseUrl: {{ printf "%s/" .forum_origin }}, topicId: {{ .topic_id }}{{ if or (ne $mode "from_discourse") (eq $sourceMode "interactive") }}, fullApp: true, embedHeight: "360px", dynamicHeight: true, embedMinHeight: "360"{{ if eq $mode "from_discourse" }}, className: "discussion-bridge-source-presentation"{{ end }}{{ end }} };
         (() => { const script = document.createElement("script"); script.async = true; script.src = {{ printf "%s/javascripts/embed.js" .forum_origin }}; document.body.appendChild(script); })();
       </script>
       {{ end }}
@@ -84,7 +89,11 @@
   {{ else }}
     {{- errorf "DiscussionBridge mode %q is unsupported" $requestedMode -}}
   {{ end }}
-  {{ partial "discussionbridge-credit.html" . }}
+  {{ if or (not (isset site.Params "discussionbridge_credit_enabled")) (eq site.Params.discussionbridge_credit_enabled true) }}
+    {{ partial "discussionbridge/credit-style.html" . }}
+    {{ partial "discussionbridge-credit.html" . }}
+  {{ end }}
+{{ partial "discussionbridge/discussion-labels.html" . }}
 </section>
 {{ with $record.cms_verification }}{{ printf "<!--discussionbridge-cms-end:%s-->" .mapping_id | safeHTML }}{{ end }}
 {{ if $richContent }}<script src="/discussionbridge/rich-content.js" defer></script>{{ end }}

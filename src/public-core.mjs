@@ -50,7 +50,7 @@ export async function retrieveSimple(page, config, fetchImpl) {
   const topicUrl = new URL(`/t/${slug}/${page.topic_id}`, base).href;
   const replies = ids.map((id) => simpleReply(byId.get(id), topicUrl, base)).filter(Boolean);
   return { topic_id: page.topic_id, topic_url: topicUrl, forum_origin: base.origin,
-    simple_html: simpleMarkup(replies, topicUrl, stream.length - 1 > 50, poweredBy, wordmark) };
+    simple_html: simpleMarkup(replies, topicUrl, stream.length - 1 > 50, poweredBy, wordmark, config.forumName) };
 }
 
 async function publicPoweredByDiscourse(base, config, fetchImpl) {
@@ -105,13 +105,14 @@ function simpleReply(post, topicUrl, base) {
   return `<article class="discussionbridge-simple__reply"><span class="discussionbridge-simple__avatar" aria-hidden="true">${avatar}</span><div class="discussionbridge-simple__content"><header class="discussionbridge-simple__meta"><strong>${escapeHtml(name)}</strong><a href="${escapeHtml(href)}" rel="nofollow noopener noreferrer"><time datetime="${escapeHtml(date.toISOString())}">${escapeHtml(date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }))}</time></a></header><div class="discussionbridge-simple__body">${body}</div></div></article>`;
 }
 
-function simpleMarkup(replies, topicUrl, truncated, poweredBy, wordmark) {
+function simpleMarkup(replies, topicUrl, truncated, poweredBy, wordmark, forumName) {
   const initial = replies.slice(0, 5).join(""); const rest = replies.slice(5);
   const more = rest.length ? `<details class="discussionbridge-simple__more"><summary><span class="discussionbridge-simple__more-closed">Show ${rest.length} more ${rest.length === 1 ? "comment" : "comments"}</span><span class="discussionbridge-simple__more-open">Show fewer comments</span></summary>${rest.join("")}</details>` : "";
   const limit = truncated ? `<p class="discussionbridge-simple__limit">Showing the first 50 comments. <a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">View the complete source discussion</a>.</p>` : "";
   const attribution = `<div data-discussionbridge-attributions><a class="discussionbridge-powered-by" data-discussionbridge-powered-by href="https://www.discourse.org/powered-by" aria-label="Powered by Discourse" rel="nofollow noopener noreferrer"${poweredBy ? "" : " hidden"}><span>Powered by</span><span class="discussionbridge-powered-by__wordmark">${wordmark}</span></a></div>`;
   const styles = '<style>.discussionbridge-powered-by{display:flex;align-items:center;justify-content:center;gap:.45rem;margin:.8rem auto 0;color:inherit;font-size:.8rem;text-decoration:none;opacity:.72}.discussionbridge-powered-by[hidden]{display:none}.discussionbridge-powered-by__wordmark{display:inline-flex;width:6.4rem;padding:.12rem .28rem;border-radius:.2rem;background:#fff}.discussionbridge-powered-by__wordmark svg{display:block;width:100%;height:auto}</style>';
-  return `<div class="discussionbridge-simple__header"><h2>Comments</h2><a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer">Open discussion</a></div>${replies.length ? initial + more : '<p class="discussionbridge-simple__empty">No comments yet.</p>'}${limit}${attribution}${styles}`;
+  const label = forumName ? `Open in ${forumName}` : "";
+  return `<div class="discussionbridge-simple__header"><h2>Discussion</h2><a href="${escapeHtml(topicUrl)}" rel="nofollow noopener noreferrer" data-discussionbridge-forum-label="${escapeHtml(label)}">Open in forum</a></div>${replies.length ? initial + more : '<p class="discussionbridge-simple__empty">No comments yet.</p>'}${limit}${attribution}${styles}`;
 }
 
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]); }

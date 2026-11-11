@@ -1,0 +1,55 @@
+<style data-discussionbridge-credit-style>
+/* Customize credit colors with the inherited --discussionbridge-credit-* properties. */
+:is(footer, p).discussionbridge-credit {
+  margin: 0.45rem 0 0;
+  color: var(--sl-color-gray-3, inherit);
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.discussionbridge-credit > a:any-link {
+  position: relative;
+  padding-inline: 0.22em;
+  border-radius: 0.2em;
+  color: var(--discussionbridge-credit-link-color, inherit);
+  background-color: var(--discussionbridge-credit-background, transparent);
+  text-decoration: none;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.discussionbridge-credit > a::after {
+  position: absolute;
+  inset-inline: 0.22em;
+  bottom: -0.12em;
+  height: 1px;
+  background: currentColor;
+  content: "";
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 180ms ease;
+}
+
+.discussionbridge-credit > a:is(:hover, :focus-visible) {
+  --_discussionbridge-credit-accent: var(--sl-color-accent-high, var(--wp--preset--color--accent-2, var(--ghost-accent-color, #3451b2)));
+  color: var(--discussionbridge-credit-hover-link-color, var(--_discussionbridge-credit-accent));
+  background-color: var(--discussionbridge-credit-hover-background, color-mix(in srgb, currentColor 16%, transparent));
+}
+
+.discussionbridge-credit > a:is(:hover, :focus-visible)::after {
+  transform: scaleX(1);
+}
+
+.discussionbridge-credit > a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 0.2rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discussionbridge-credit > a,
+  .discussionbridge-credit > a::after {
+    transition: none;
+  }
+}
+</style>

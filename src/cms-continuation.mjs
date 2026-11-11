@@ -31,7 +31,11 @@ export async function withCmsContinuation({ privateRoot, nativeRoot, publicRoots
     const projectionKeys = ["projection", "recovery_projection"];
     if (Object.keys(state).some((key) => !stateKeys.includes(key) && !projectionKeys.includes(key))
         || stateKeys.some((key) => !Object.hasOwn(state, key))) throw new Error("Hugo CMS continuation fields need reconciliation.");
-    if (state.schema_version !== "db-hugo-cms-continuation-1" || semanticIdentity(state.binding) !== semanticIdentity(binding)
+    const bindingChanged = semanticIdentity(state.binding) !== semanticIdentity(binding);
+    const policyChanged = bindingChanged && state.binding?.policy_revision !== binding.policy_revision
+      && state.binding?.connection_id === binding.connection_id && state.binding.forum_origin === binding.forum_origin
+      && state.binding.destination_origin === binding.destination_origin;
+    if (state.schema_version !== "db-hugo-cms-continuation-1" || bindingChanged && !policyChanged
         || !["initial", "changes"].includes(state.stream)) throw new Error("Hugo CMS continuation scope changed; mapping reconciliation is required.");
     for (const key of ["next_cursor", "checkpoint_cursor"]) if (state[key] !== null) validateCms("Cursor", state[key]);
     if (state.last_sequence !== null) validateCms("CoreId", state.last_sequence);
@@ -106,6 +110,21 @@ export async function withCmsContinuation({ privateRoot, nativeRoot, publicRoots
         if (semanticIdentity(parseCmsJson(before, { maximumBytes: 262144 })) !== semanticIdentity(value)) throw new Error("Hugo CMS immutable source/event identity changed.");
       } else await replace(file, bytes, null);
     };
+    if (policyChanged) {
+      validateCms("Revision", state.binding.policy_revision);
+      if (state.pending !== null || state.active_lease !== null || state.recovery_projection
+          || state.held_leases.some(entry => entry.state === "held")) {
+        throw new Error("Hugo CMS policy changed while native work is unresolved; reconcile that work first.");
+      }
+      await immutable(path.join(privateRoot, "prior-authority", `${stateHash}.json`), state);
+      state.binding = binding;
+      state.recovery_projection = randomUUID();
+      state.stream = "initial";
+      state.next_cursor = null;
+      state.checkpoint_cursor = null;
+      state.last_initial_source = null;
+      await save();
+    }
     const credential = async (token) => {
       validateCms("LeaseToken", token); const bytes = Buffer.from(token); const digest = sha(bytes);
       const file = path.join(privateRoot, "credentials", `${digest}.token`); const before = await regular(file);

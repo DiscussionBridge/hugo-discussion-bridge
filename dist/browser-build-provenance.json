@@ -20,8 +20,8 @@
       "sha256": "4e9c61aac089e3a20853cd5b8b59482e1609ebc4ff8f875177f92e9f5dbfbe6d"
     },
     "src/browser-simple.mjs": {
-      "bytes": 10486,
-      "sha256": "3e9e404838bfc55897e09f212b47ae36dedca4d7a51ce85b63d3d22a549e6f05"
+      "bytes": 10679,
+      "sha256": "ef796dfde04961f9cd8ca79bdb156b79c2594c072896c4784b89c95509055692"
     },
     "src/browser-rich-content.mjs": {
       "bytes": 2783,
@@ -30,8 +30,8 @@
   },
   "outputs": {
     "discussionbridge-simple.js": {
-      "bytes": 38000,
-      "sha256": "90bec25f52050cddfb31a07e7cf51ca0568d858b224a9527baedd4152b5b29db"
+      "bytes": 38107,
+      "sha256": "2ba4748b903cd1222076734937203ed72f36c4d86c62c26f6ad7a015cd52ee1b"
     },
     "discussionbridge-rich-content.js": {
       "bytes": 4913372,
