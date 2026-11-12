@@ -25,9 +25,8 @@ async function operationState(continuation, transactionId) {
   return command;
 }
 
-// The current public artifact is only a candidate for baseline proof. Require
-// its actual owned fragment to equal the retained verified hash before using
-// the existing anonymous verifier against the exact retained URL/identity.
+// Match the built page's owned fragment against the retained hash, then
+// independently verify the retained public URL and identity.
 async function publicBaseline({ config, baseline, publicFetch, now }) {
   const previous = baseline?.finalize_report?.verification;
   if (!previous || baseline.phase !== "verified") throw new Error("Hugo baseline public evidence is unavailable.");
